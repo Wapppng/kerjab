@@ -14,6 +14,7 @@ type Task = {
   deskripsi: string | null
   kategori: string
   kpi_level: number
+  kpi_bobot?: number
   estimasi_waktu_menit: number
   realisasi_waktu_menit: number | null
   link_hasil: string | null
@@ -37,6 +38,8 @@ export function TaskList({ tasks, isAdmin, userId }: { tasks: Task[]; isAdmin: b
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterKategori, setFilterKategori] = useState("all")
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [error, setError] = useState("")
 
   const filtered = tasks.filter((t) => {
     if (filterStatus !== "all" && t.status !== filterStatus) return false
@@ -47,25 +50,37 @@ export function TaskList({ tasks, isAdmin, userId }: { tasks: Task[]; isAdmin: b
 
   async function handleDelete(id: string) {
     if (!confirm("Hapus task ini?")) return
-    await supabase.from("tasks").delete().eq("id", id)
+    setError("")
+    const { error: deleteError } = await supabase.from("tasks").delete().eq("id", id)
+    if (deleteError) {
+      setError(`Task belum terhapus: ${deleteError.message}`)
+      return
+    }
     router.refresh()
   }
 
   async function handleStatusChange(task: Task, status: string) {
-    const now = new Date()
-    const updates: Record<string, unknown> = { status }
-    if (status === "selesai" && task.status !== "selesai") {
-      updates.selesai_at = now.toISOString()
-      updates.waktu_terselesaikan = task.waktu_terselesaikan || now.toISOString()
+    setError("")
+    setUpdatingId(task.id)
+    const { error: updateError } = await supabase
+      .from("tasks")
+      .update({ status })
+      .eq("id", task.id)
+
+    if (updateError) {
+      setError(`Status belum berubah: ${updateError.message}`)
+      setUpdatingId(null)
+      return
     }
-    await supabase.from("tasks").update(updates).eq("id", task.id)
+
     router.refresh()
+    setUpdatingId(null)
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:max-w-xs sm:flex-1">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
           <input
             className="notion-input pl-8"
@@ -75,7 +90,7 @@ export function TaskList({ tasks, isAdmin, userId }: { tasks: Task[]; isAdmin: b
           />
         </div>
         <select
-          className="notion-select"
+          className="notion-select w-full sm:w-auto"
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
         >
@@ -86,7 +101,7 @@ export function TaskList({ tasks, isAdmin, userId }: { tasks: Task[]; isAdmin: b
           <option value="selesai">Selesai</option>
         </select>
         <select
-          className="notion-select"
+          className="notion-select w-full sm:w-auto"
           value={filterKategori}
           onChange={(e) => setFilterKategori(e.target.value)}
         >
@@ -97,13 +112,19 @@ export function TaskList({ tasks, isAdmin, userId }: { tasks: Task[]; isAdmin: b
         </select>
       </div>
 
+      {error && (
+        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+          {error}
+        </p>
+      )}
+
       {filtered.length === 0 ? (
         <div className="py-16 text-center text-sm text-neutral-400">
           Belum ada task
         </div>
       ) : (
-        <div className="rounded-lg border border-[#e5e5e5] overflow-hidden">
-          <table className="notion-table">
+        <div className="overflow-x-auto rounded-lg border border-[#e5e5e5]">
+          <table className="notion-table min-w-[760px]">
             <thead>
               <tr>
                 <th className="w-3"></th>
@@ -142,13 +163,17 @@ export function TaskList({ tasks, isAdmin, userId }: { tasks: Task[]; isAdmin: b
                       )}
                     </td>
                     <td className="text-neutral-500 text-xs capitalize">{task.kategori.replace("_", " ")}</td>
-                    <td className="text-neutral-500 text-xs">{task.kpi_level}</td>
+                    <td className="text-neutral-500 text-xs">
+                      {task.kpi_bobot ?? task.kpi_level} <span className="text-neutral-300">(L{task.kpi_level})</span>
+                    </td>
                     <td className="text-neutral-500 text-xs">{formatMenit(task.estimasi_waktu_menit)}</td>
                     <td>
                       <select
                         className="notion-select text-xs"
                         value={task.status}
                         onChange={(e) => handleStatusChange(task, e.target.value)}
+                        disabled={updatingId === task.id}
+                        aria-label={`Ubah status ${task.judul}`}
                       >
                         <option value="pending">Pending</option>
                         <option value="progress">Progress</option>
@@ -159,15 +184,15 @@ export function TaskList({ tasks, isAdmin, userId }: { tasks: Task[]; isAdmin: b
                     <td>
                       <div className="flex items-center gap-0.5">
                         {task.link_hasil && (
-                          <a href={task.link_hasil} target="_blank" rel="noopener noreferrer" className="notion-btn p-1">
+                          <a href={task.link_hasil} target="_blank" rel="noopener noreferrer" className="notion-btn p-1" aria-label={`Buka hasil ${task.judul}`}>
                             <ExternalLink className="h-3.5 w-3.5" />
                           </a>
                         )}
-                        <Link href={`/dashboard/tasks/${task.id}`} className="notion-btn p-1">
+                        <Link href={`/dashboard/tasks/${task.id}`} className="notion-btn p-1" aria-label={`Edit ${task.judul}`}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Link>
                         {(isAdmin || task.user_id === userId) && (
-                          <button className="notion-btn p-1 text-neutral-400 hover:text-red-500" onClick={() => handleDelete(task.id)}>
+                          <button className="notion-btn p-1 text-neutral-400 hover:text-red-500" onClick={() => handleDelete(task.id)} aria-label={`Hapus ${task.judul}`}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}

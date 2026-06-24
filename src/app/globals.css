@@ -102,6 +102,15 @@ body {
 .notion-btn:hover {
   background: rgba(55, 53, 47, 0.06);
 }
+.notion-btn:focus-visible,
+.notion-sidebar-item:focus-visible {
+  outline: 2px solid #2383e2;
+  outline-offset: 2px;
+}
+.notion-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 
 .notion-btn-primary {
   background: #37352f;

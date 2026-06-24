@@ -20,7 +20,15 @@ CREATE POLICY profiles_select ON profiles
   );
 
 CREATE POLICY profiles_update ON profiles
-  FOR UPDATE USING (id = auth.uid());
+  FOR UPDATE
+  USING (
+    id = auth.uid()
+    AND role IN ('designer', 'video_editor')
+  )
+  WITH CHECK (
+    id = auth.uid()
+    AND role IN ('designer', 'video_editor')
+  );
 
 -- Drop & recreate tasks policies
 DROP POLICY IF EXISTS tasks_select ON tasks;

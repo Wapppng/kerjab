@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { KATEGORI_LIST, getKpiList, formatMenit } from "@/lib/utils"
+import { KATEGORI_LIST, getKpiList, formatMenit, type KpiItem } from "@/lib/utils"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
@@ -14,6 +14,7 @@ type Task = {
   deskripsi: string | null
   kategori: string
   kpi_level: number
+  kpi_bobot?: number
   estimasi_waktu_menit: number
   realisasi_waktu_menit: number | null
   link_hasil: string | null
@@ -32,10 +33,11 @@ const STATUS_OPTIONS = [
 
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
   const [judul, setJudul] = useState("")
   const [deskripsi, setDeskripsi] = useState("")
   const [kategori, setKategori] = useState("")
@@ -45,7 +47,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [waktuTerselesaikan, setWaktuTerselesaikan] = useState("")
   const [kuantitasOutput, setKuantitasOutput] = useState("1")
   const [realisasi, setRealisasi] = useState("")
-  const [userRole, setUserRole] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<"designer" | "video_editor">("designer")
+  const [kpiList, setKpiList] = useState<readonly KpiItem[]>([])
 
   useEffect(() => {
     async function load() {
@@ -62,28 +65,45 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       setWaktuTerselesaikan(data.waktu_terselesaikan ? data.waktu_terselesaikan.slice(0, 16) : "")
       setKuantitasOutput(data.kuantitas_output ? String(data.kuantitas_output) : "1")
       setRealisasi(data.realisasi_waktu_menit ? String(data.realisasi_waktu_menit) : "")
-      setLoading(false)
-
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user_id).single()
-      setUserRole(profile?.role ?? null)
+      const role = profile?.role === "video_editor" ? "video_editor" : "designer"
+      const { data: config } = await supabase
+        .from("kpi_config")
+        .select("level, label, bobot, estimasi_waktu_menit")
+        .eq("role", role)
+        .order("level", { ascending: true })
+
+      setUserRole(role)
+      setKpiList(config?.length
+        ? config.map((item) => ({
+            level: item.level,
+            label: item.label,
+            bobot: item.bobot,
+            estimasi: item.estimasi_waktu_menit,
+          }))
+        : getKpiList(role))
+      setLoading(false)
     }
     load()
   }, [params, supabase, router])
 
-  const kpiList = getKpiList(userRole)
+  const kpiInfo = kpiList.find((k) => k.level === Number(kpiLevel))
 
   async function handleSave() {
+    setError("")
     setSaving(true)
     const now = new Date()
-    const completionTime = status === "selesai" && task?.status !== "selesai" && !waktuTerselesaikan
-      ? now.toISOString()
-      : (waktuTerselesaikan ? new Date(waktuTerselesaikan).toISOString() : null)
+    const completionTime = status === "selesai"
+      ? (waktuTerselesaikan ? new Date(waktuTerselesaikan).toISOString() : now.toISOString())
+      : null
 
     const updates: Record<string, unknown> = {
       judul,
       deskripsi: deskripsi || null,
       kategori,
       kpi_level: Number(kpiLevel),
+      kpi_bobot: kpiInfo?.bobot ?? task?.kpi_bobot ?? Number(kpiLevel),
+      estimasi_waktu_menit: kpiInfo?.estimasi ?? task?.estimasi_waktu_menit ?? 0,
       status,
       link_hasil: linkHasil || null,
       waktu_terselesaikan: completionTime,
@@ -91,17 +111,35 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       realisasi_waktu_menit: realisasi ? Number(realisasi) : null,
     }
 
-    if (status === "selesai" && task?.status !== "selesai") updates.selesai_at = now.toISOString()
+    const { error: saveError } = await supabase.from("tasks").update(updates).eq("id", task!.id)
+    if (saveError) {
+      setError(`Perubahan belum tersimpan: ${saveError.message}`)
+      setSaving(false)
+      return
+    }
 
-    await supabase.from("tasks").update(updates).eq("id", task!.id)
+    setTask((current) => current ? {
+      ...current,
+      judul,
+      deskripsi: deskripsi || null,
+      kategori,
+      kpi_level: Number(kpiLevel),
+      kpi_bobot: kpiInfo?.bobot ?? current.kpi_bobot,
+      estimasi_waktu_menit: kpiInfo?.estimasi ?? current.estimasi_waktu_menit,
+      status,
+      link_hasil: linkHasil || null,
+      waktu_terselesaikan: completionTime,
+      selesai_at: completionTime,
+      kuantitas_output: Number(kuantitasOutput) || 1,
+      realisasi_waktu_menit: realisasi ? Number(realisasi) : null,
+    } : current)
+    setWaktuTerselesaikan(completionTime ? completionTime.slice(0, 16) : "")
     setSaving(false)
     router.refresh()
   }
 
   if (loading) return <div className="text-sm text-neutral-400 py-8">Memuat...</div>
   if (!task) return null
-
-  const kpiInfo = kpiList.find((k) => k.level === Number(kpiLevel))
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -113,6 +151,9 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         <span className={`notion-dot ${STATUS_OPTIONS.find(s => s.value === status)?.dot || "bg-neutral-300"}`} />
         <h1 className="text-2xl font-semibold tracking-tight">Edit Task</h1>
       </div>
+      <p className="-mt-6 text-sm text-neutral-400">
+        KPI mengikuti role {userRole === "designer" ? "Desain Grafis" : "Videografer"}
+      </p>
 
       <div className="space-y-6">
         <div>
@@ -180,6 +221,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           <div>
             <label className="text-sm font-medium text-neutral-700">Link Hasil</label>
             <input
+              type="url"
               className="notion-input mt-1"
               placeholder="https://drive.google.com/..."
               value={linkHasil}
@@ -193,7 +235,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               className="notion-input mt-1"
               value={waktuTerselesaikan}
               onChange={(e) => setWaktuTerselesaikan(e.target.value)}
+              disabled={status !== "selesai"}
             />
+            <p className="mt-1 text-xs text-neutral-400">
+              {status === "selesai" ? "Bisa disesuaikan untuk pekerjaan yang dicatat terlambat." : "Aktif setelah status menjadi Selesai."}
+            </p>
           </div>
         </div>
 
@@ -216,6 +262,12 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             {saving ? "Menyimpan..." : "Simpan Perubahan"}
           </button>
         </div>
+
+        {error && (
+          <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   )

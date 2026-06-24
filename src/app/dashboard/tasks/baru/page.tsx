@@ -3,45 +3,82 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { KATEGORI_LIST, getKpiList } from "@/lib/utils"
+import { KATEGORI_LIST, getKpiList, type KpiItem } from "@/lib/utils"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
 export default function NewTaskPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [loading, setLoading] = useState(false)
-  const [userRole, setUserRole] = useState<string | null>(null)
+  const [error, setError] = useState("")
+  const [kpiLoading, setKpiLoading] = useState(true)
+  const [userRole, setUserRole] = useState<"designer" | "video_editor">("designer")
+  const [kpiList, setKpiList] = useState<readonly KpiItem[]>([])
   const [form, setForm] = useState({
     judul: "",
     deskripsi: "",
     kategori: "",
     kpi_level: "",
-    waktu_terselesaikan: "",
     kuantitas_output: "1",
     link_hasil: "",
   })
 
   useEffect(() => {
-    async function loadProfile() {
+    let active = true
+
+    async function loadKpiForRole() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-      setUserRole(data?.role ?? null)
+      if (!user) {
+        if (active) setKpiLoading(false)
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+
+      const role = profile?.role === "video_editor" ? "video_editor" : "designer"
+      const { data: config } = await supabase
+        .from("kpi_config")
+        .select("level, label, bobot, estimasi_waktu_menit")
+        .eq("role", role)
+        .order("level", { ascending: true })
+
+      if (!active) return
+
+      setUserRole(role)
+      setKpiList(config?.length
+        ? config.map((item) => ({
+            level: item.level,
+            label: item.label,
+            bobot: item.bobot,
+            estimasi: item.estimasi_waktu_menit,
+          }))
+        : getKpiList(role))
+      setKpiLoading(false)
     }
-    loadProfile()
+
+    loadKpiForRole()
+    return () => { active = false }
   }, [supabase])
 
-  const kpiList = getKpiList(userRole)
   const selectedKpi = kpiList.find((k) => k.level === Number(form.kpi_level))
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.judul || !form.kategori || !form.kpi_level) return
+    if (!form.judul || !form.kategori || !form.kpi_level || !selectedKpi) return
+    setError("")
     setLoading(true)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setError("Sesi kamu sudah berakhir. Silakan masuk kembali.")
+      setLoading(false)
+      return
+    }
 
     const { error } = await supabase.from("tasks").insert({
       user_id: user.id,
@@ -50,12 +87,15 @@ export default function NewTaskPage() {
       kategori: form.kategori,
       kpi_level: Number(form.kpi_level),
       estimasi_waktu_menit: selectedKpi?.estimasi || 0,
-      waktu_terselesaikan: form.waktu_terselesaikan ? new Date(form.waktu_terselesaikan).toISOString() : null,
       kuantitas_output: Number(form.kuantitas_output || 1),
       link_hasil: form.link_hasil || null,
     })
 
-    if (error) { alert("Gagal: " + error.message); setLoading(false); return }
+    if (error) {
+      setError(`Task belum tersimpan: ${error.message}`)
+      setLoading(false)
+      return
+    }
     router.push("/dashboard/tasks")
     router.refresh()
   }
@@ -68,7 +108,9 @@ export default function NewTaskPage() {
 
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Task Baru</h1>
-        <p className="mt-1 text-sm text-neutral-400">Isi detail tugas yang akan dikerjakan</p>
+        <p className="mt-1 text-sm text-neutral-400">
+          KPI mengikuti role {userRole === "designer" ? "Desain Grafis" : "Videografer"}
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -109,14 +151,17 @@ export default function NewTaskPage() {
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-neutral-700">KPI</label>
+            <label className="text-sm font-medium text-neutral-700">
+              KPI {userRole === "designer" ? "Desain Grafis" : "Videografer"}
+            </label>
             <select
               className="notion-select mt-1 w-full"
               value={form.kpi_level}
               onChange={(e) => setForm({ ...form, kpi_level: e.target.value })}
+              disabled={kpiLoading}
               required
             >
-              <option value="" disabled>Pilih tingkat kesulitan</option>
+              <option value="" disabled>{kpiLoading ? "Memuat aturan KPI..." : "Pilih tingkat kesulitan"}</option>
               {kpiList.map((k) => (
                 <option key={k.level} value={k.level}>
                   {k.label} (bobot {k.bobot})
@@ -134,15 +179,6 @@ export default function NewTaskPage() {
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-neutral-700">Waktu Terselesaikan</label>
-            <input
-              type="datetime-local"
-              className="notion-input mt-1"
-              value={form.waktu_terselesaikan}
-              onChange={(e) => setForm({ ...form, waktu_terselesaikan: e.target.value })}
-            />
-          </div>
-          <div>
             <label className="text-sm font-medium text-neutral-700">Kuantitas Output</label>
             <input
               type="number"
@@ -158,12 +194,23 @@ export default function NewTaskPage() {
         <div>
           <label className="text-sm font-medium text-neutral-700">Link Hasil</label>
           <input
+            type="url"
             className="notion-input mt-1"
             placeholder="https://drive.google.com/..."
             value={form.link_hasil}
             onChange={(e) => setForm({ ...form, link_hasil: e.target.value })}
           />
         </div>
+
+        <p className="text-xs text-neutral-400">
+          Waktu selesai dicatat otomatis ketika status task diubah menjadi Selesai.
+        </p>
+
+        {error && (
+          <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+            {error}
+          </p>
+        )}
 
         <div className="flex gap-3 pt-2">
           <button type="submit" className="notion-btn notion-btn-primary" disabled={loading}>

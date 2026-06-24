@@ -9,6 +9,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [role, setRole] = useState<"designer" | "video_editor">("designer")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -21,7 +22,7 @@ export default function RegisterPage() {
 
     const { error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { name } },
+      options: { data: { name, role } },
     })
 
     if (error) { setError(error.message); setLoading(false); return }
@@ -67,6 +68,18 @@ export default function RegisterPage() {
             onChange={(e) => setPassword(e.target.value)}
             required minLength={6}
           />
+        </div>
+        <div>
+          <label className="text-sm font-medium text-neutral-700">Role Pekerjaan</label>
+          <select
+            className="notion-select mt-1 w-full"
+            value={role}
+            onChange={(e) => setRole(e.target.value as "designer" | "video_editor")}
+            required
+          >
+            <option value="designer">Desain Grafis</option>
+            <option value="video_editor">Videografer</option>
+          </select>
         </div>
 
         {error && <p className="text-sm text-red-500">{error}</p>}

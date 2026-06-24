@@ -27,14 +27,17 @@ export default async function TasksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Task Harian</h1>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Pekerjaan</h1>
+          <p className="mt-1 hidden text-sm text-neutral-400 sm:block">Kelola pekerjaan, status, dan output dalam satu tempat.</p>
+        </div>
         <Link
           href="/dashboard/tasks/baru"
           className="notion-btn notion-btn-primary"
         >
           <Plus className="h-4 w-4" />
-          Task Baru
+          <span className="hidden sm:inline">Task Baru</span>
         </Link>
       </div>
 

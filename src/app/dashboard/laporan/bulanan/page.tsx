@@ -1,8 +1,66 @@
+import Link from "next/link"
+import { CalendarRange, Filter, RotateCcw } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
-import { getBulanName, formatMenit } from "@/lib/utils"
+import { formatMenit, getBulanName, KATEGORI_LIST } from "@/lib/utils"
 import { LaporanClient } from "./laporan-client"
+import type { ReportCategorySummary, ReportUserSummary } from "./laporan-types"
 
-export default async function LaporanBulananPage() {
+type ReportSearchParams = Promise<{
+  bulan?: string | string[]
+  tahun?: string | string[]
+  user?: string | string[]
+  kategori?: string | string[]
+}>
+
+type ProfileOption = {
+  id: string
+  name: string
+}
+
+type ReportTask = {
+  user_id: string
+  kategori: string
+  kpi_level: number
+  kpi_bobot: number | null
+  estimasi_waktu_menit: number
+  realisasi_waktu_menit: number | null
+  kuantitas_output: number | null
+  profiles: { name: string }[] | null
+}
+
+function firstValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function periodBoundaries(year: number, month: number) {
+  const nextMonth = month === 12 ? 1 : month + 1
+  const nextYear = month === 12 ? year + 1 : year
+  const monthText = String(month).padStart(2, "0")
+  const nextMonthText = String(nextMonth).padStart(2, "0")
+
+  return {
+    start: new Date(`${year}-${monthText}-01T00:00:00+07:00`).toISOString(),
+    end: new Date(`${nextYear}-${nextMonthText}-01T00:00:00+07:00`).toISOString(),
+  }
+}
+
+function getUserSummary(summaries: Record<string, ReportUserSummary>, task: ReportTask) {
+  if (!summaries[task.user_id]) {
+    summaries[task.user_id] = {
+      name: task.profiles?.[0]?.name || "Tanpa Nama",
+      totalCreated: 0,
+      totalCompleted: 0,
+      totalOutput: 0,
+      totalKpi: 0,
+      totalEstimasi: 0,
+      totalRealisasi: 0,
+    }
+  }
+
+  return summaries[task.user_id]
+}
+
+export default async function LaporanBulananPage({ searchParams }: { searchParams: ReportSearchParams }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
@@ -14,133 +72,215 @@ export default async function LaporanBulananPage() {
     .single()
 
   const isAdmin = profile?.role === "admin"
-
+  const query = await searchParams
   const now = new Date()
-  const bulan = now.getMonth() + 1
-  const tahun = now.getFullYear()
-  const startDate = `${tahun}-${String(bulan).padStart(2, "0")}-01`
-  const endDate = new Date(tahun, bulan, 0).toISOString().split("T")[0]
+  const requestedMonth = Number(firstValue(query.bulan))
+  const requestedYear = Number(firstValue(query.tahun))
+  const month = requestedMonth >= 1 && requestedMonth <= 12 ? requestedMonth : now.getMonth() + 1
+  const year = requestedYear >= 2020 && requestedYear <= 2100 ? requestedYear : now.getFullYear()
+  const selectedUser = isAdmin ? firstValue(query.user) || "" : user.id
+  const selectedCategory = firstValue(query.kategori) || ""
+  const validCategory = KATEGORI_LIST.some((category) => category.value === selectedCategory)
+    ? selectedCategory
+    : ""
+  const period = periodBoundaries(year, month)
 
-  let query = supabase
+  let createdQuery = supabase
     .from("tasks")
-    .select("*, profiles(name)")
-    .gte("created_at", startDate)
-    .lte("created_at", endDate + "T23:59:59.999Z")
+    .select("user_id, kategori, kpi_level, kpi_bobot, estimasi_waktu_menit, realisasi_waktu_menit, kuantitas_output, profiles(name)")
+    .gte("created_at", period.start)
+    .lt("created_at", period.end)
 
-  if (!isAdmin) query = query.eq("user_id", user.id)
+  let completedQuery = supabase
+    .from("tasks")
+    .select("user_id, kategori, kpi_level, kpi_bobot, estimasi_waktu_menit, realisasi_waktu_menit, kuantitas_output, profiles(name)")
+    .eq("status", "selesai")
+    .gte("waktu_terselesaikan", period.start)
+    .lt("waktu_terselesaikan", period.end)
 
-  const { data: tasks } = await query
-
-  const { data: allProfiles } = await supabase
-    .from("profiles")
-    .select("*")
-    .order("name")
-
-  const taskByUser: Record<string, { name: string; total: number; selesai: number; totalKpi: number; totalEstimasi: number; totalRealisasi: number }> = {}
-  const taskByKategori: Record<string, number> = {}
-  const taskByStatus: Record<string, number> = {}
-
-  for (const task of tasks || []) {
-    const uid = task.user_id
-    if (!taskByUser[uid]) {
-      taskByUser[uid] = { name: task.profiles?.name || "Unknown", total: 0, selesai: 0, totalKpi: 0, totalEstimasi: 0, totalRealisasi: 0 }
-    }
-    taskByUser[uid].total++
-    taskByUser[uid].totalKpi += task.kpi_level
-    taskByUser[uid].totalEstimasi += task.estimasi_waktu_menit
-    if (task.realisasi_waktu_menit) taskByUser[uid].totalRealisasi += task.realisasi_waktu_menit
-    if (task.status === "selesai") taskByUser[uid].selesai++
-    taskByKategori[task.kategori] = (taskByKategori[task.kategori] || 0) + 1
-    taskByStatus[task.status] = (taskByStatus[task.status] || 0) + 1
+  if (selectedUser) {
+    createdQuery = createdQuery.eq("user_id", selectedUser)
+    completedQuery = completedQuery.eq("user_id", selectedUser)
   }
 
-  const totalTask = tasks?.length || 0
-  const totalSelesai = tasks?.filter((t) => t.status === "selesai").length || 0
-  const totalKpi = tasks?.reduce((s, t) => s + t.kpi_level, 0) || 0
+  if (validCategory) {
+    createdQuery = createdQuery.eq("kategori", validCategory)
+    completedQuery = completedQuery.eq("kategori", validCategory)
+  }
+
+  const [createdResult, completedResult, profilesResult] = await Promise.all([
+    createdQuery,
+    completedQuery,
+    supabase.from("profiles").select("id, name").order("name"),
+  ])
+
+  const createdTasks = (createdResult.data || []) as ReportTask[]
+  const completedTasks = (completedResult.data || []) as ReportTask[]
+  const allProfiles = (profilesResult.data || []) as ProfileOption[]
+  const taskByUser: Record<string, ReportUserSummary> = {}
+  const taskByCategory: Record<string, ReportCategorySummary> = {}
+
+  for (const task of createdTasks) {
+    getUserSummary(taskByUser, task).totalCreated += 1
+  }
+
+  for (const task of completedTasks) {
+    const summary = getUserSummary(taskByUser, task)
+    const output = task.kuantitas_output || 1
+    summary.totalCompleted += 1
+    summary.totalOutput += output
+    summary.totalKpi += task.kpi_bobot ?? task.kpi_level
+    summary.totalEstimasi += task.estimasi_waktu_menit
+    summary.totalRealisasi += task.realisasi_waktu_menit || 0
+
+    if (!taskByCategory[task.kategori]) {
+      taskByCategory[task.kategori] = { completedTasks: 0, totalOutput: 0 }
+    }
+    taskByCategory[task.kategori].completedTasks += 1
+    taskByCategory[task.kategori].totalOutput += output
+  }
+
+  const totalKpi = completedTasks.reduce((total, task) => total + (task.kpi_bobot ?? task.kpi_level), 0)
+  const totalOutput = completedTasks.reduce((total, task) => total + (task.kuantitas_output || 1), 0)
+  const years = Array.from({ length: 6 }, (_, index) => now.getFullYear() + 1 - index)
+  if (!years.includes(year)) years.push(year)
+  years.sort((left, right) => right - left)
 
   return (
-    <div className="space-y-10">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Laporan Bulanan</h1>
-        <p className="text-sm text-neutral-400">{getBulanName(bulan)} {tahun}</p>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-sm text-neutral-400">
+            <CalendarRange className="h-4 w-4" />
+            Laporan berdasarkan zona waktu Jakarta
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">Laporan Bulanan</h1>
+          <p className="mt-1 text-sm text-neutral-500">{getBulanName(month)} {year}</p>
+        </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <form method="get" className="grid gap-3 rounded-lg border border-[#e5e5e5] bg-[#fbfbfa] p-4 sm:grid-cols-2 lg:grid-cols-5">
+        <label className="text-xs font-medium text-neutral-500">
+          Bulan
+          <select name="bulan" defaultValue={month} className="notion-select mt-1 w-full">
+            {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
+              <option key={value} value={value}>{getBulanName(value)}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-medium text-neutral-500">
+          Tahun
+          <select name="tahun" defaultValue={year} className="notion-select mt-1 w-full">
+            {years.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+        {isAdmin && (
+          <label className="text-xs font-medium text-neutral-500">
+            Karyawan
+            <select name="user" defaultValue={selectedUser} className="notion-select mt-1 w-full">
+              <option value="">Semua karyawan</option>
+              {allProfiles.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+            </select>
+          </label>
+        )}
+        <label className="text-xs font-medium text-neutral-500">
+          Kategori
+          <select name="kategori" defaultValue={validCategory} className="notion-select mt-1 w-full">
+            <option value="">Semua kategori</option>
+            {KATEGORI_LIST.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
+          </select>
+        </label>
+        <div className="flex items-end gap-2">
+          <button type="submit" className="notion-btn notion-btn-primary flex-1 justify-center">
+            <Filter className="h-4 w-4" /> Terapkan
+          </button>
+          <Link href="/dashboard/laporan/bulanan" className="notion-btn border border-[#e5e5e5] p-2" aria-label="Reset filter">
+            <RotateCcw className="h-4 w-4" />
+          </Link>
+        </div>
+      </form>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Total Task", value: totalTask },
-          { label: "Selesai", value: totalSelesai },
-          { label: "Total KPI", value: totalKpi },
-          { label: "Sisa Task", value: totalTask - totalSelesai },
-        ].map(({ label, value }) => (
+          { label: "Task Dibuat", value: createdTasks.length, description: "Beban masuk periode ini" },
+          { label: "Task Selesai", value: completedTasks.length, description: "Output selesai periode ini" },
+          { label: "Kuantitas Output", value: totalOutput, description: "Total unit yang dihasilkan" },
+          { label: "KPI Earned", value: totalKpi, description: "Hanya dari task selesai" },
+        ].map(({ label, value, description }) => (
           <div key={label} className="rounded-lg border border-[#e5e5e5] p-4">
             <div className="text-sm text-neutral-500">{label}</div>
             <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
+            <p className="mt-1 text-xs text-neutral-400">{description}</p>
           </div>
         ))}
       </div>
 
-      <LaporanClient
-        taskByUser={taskByUser}
-        taskByKategori={taskByKategori}
-        taskByStatus={taskByStatus}
-        bulan={bulan}
-        tahun={tahun}
-        allProfiles={allProfiles || []}
-        isAdmin={isAdmin}
-      />
+      <LaporanClient taskByUser={taskByUser} taskByCategory={taskByCategory} month={month} year={year} />
 
       <section>
         <h2 className="mb-3 text-sm font-medium text-neutral-500">Rekap per Karyawan</h2>
-        <div className="rounded-lg border border-[#e5e5e5] overflow-hidden">
-          <table className="notion-table">
-            <thead>
-              <tr>
-                <th>Karyawan</th>
-                <th>Total</th>
-                <th>Selesai</th>
-                <th>Total KPI</th>
-                <th>Estimasi</th>
-                <th>Realisasi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(taskByUser).map(([uid, data]) => (
-                <tr key={uid}>
-                  <td className="font-medium">{data.name}</td>
-                  <td>{data.total}</td>
-                  <td>{data.selesai}</td>
-                  <td>{data.totalKpi}</td>
-                  <td className="text-neutral-500">{formatMenit(data.totalEstimasi)}</td>
-                  <td className="text-neutral-500">{data.totalRealisasi ? formatMenit(data.totalRealisasi) : "-"}</td>
+        {Object.keys(taskByUser).length === 0 ? (
+          <div className="rounded-lg border border-dashed border-[#dededb] py-12 text-center text-sm text-neutral-400">
+            Belum ada aktivitas pada periode dan filter ini.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-[#e5e5e5]">
+            <table className="notion-table min-w-[820px]">
+              <thead>
+                <tr>
+                  <th>Karyawan</th>
+                  <th>Dibuat</th>
+                  <th>Selesai</th>
+                  <th>Output</th>
+                  <th>KPI</th>
+                  <th>Estimasi</th>
+                  <th>Realisasi</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {Object.entries(taskByUser).map(([userId, data]) => (
+                  <tr key={userId}>
+                    <td className="font-medium">{data.name}</td>
+                    <td>{data.totalCreated}</td>
+                    <td>{data.totalCompleted}</td>
+                    <td>{data.totalOutput}</td>
+                    <td>{data.totalKpi}</td>
+                    <td className="text-neutral-500">{formatMenit(data.totalEstimasi)}</td>
+                    <td className="text-neutral-500">{data.totalRealisasi ? formatMenit(data.totalRealisasi) : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-medium text-neutral-500">Rekap per Kategori</h2>
-        <div className="rounded-lg border border-[#e5e5e5] overflow-hidden">
-          <table className="notion-table">
-            <thead>
-              <tr>
-                <th>Kategori</th>
-                <th>Jumlah</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(taskByKategori)
-                .sort(([, a], [, b]) => b - a)
-                .map(([kategori, jumlah]) => (
-                  <tr key={kategori}>
-                    <td className="capitalize font-medium">{kategori.replace("_", " ")}</td>
-                    <td>{jumlah}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
+        <h2 className="mb-3 text-sm font-medium text-neutral-500">Output per Kategori</h2>
+        {Object.keys(taskByCategory).length === 0 ? (
+          <div className="rounded-lg border border-dashed border-[#dededb] py-12 text-center text-sm text-neutral-400">
+            Belum ada output selesai pada periode ini.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-[#e5e5e5]">
+            <table className="notion-table min-w-[480px]">
+              <thead>
+                <tr><th>Kategori</th><th>Task Selesai</th><th>Kuantitas Output</th></tr>
+              </thead>
+              <tbody>
+                {Object.entries(taskByCategory)
+                  .sort(([, left], [, right]) => right.totalOutput - left.totalOutput)
+                  .map(([category, data]) => (
+                    <tr key={category}>
+                      <td className="font-medium capitalize">{category.replaceAll("_", " ")}</td>
+                      <td>{data.completedTasks}</td>
+                      <td>{data.totalOutput}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   )
