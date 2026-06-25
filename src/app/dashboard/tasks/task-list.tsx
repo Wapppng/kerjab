@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
@@ -111,7 +111,10 @@ export function TaskList({
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState(searchParams.get("status") || "all")
   const [filterKategori, setFilterKategori] = useState(searchParams.get("kategori") || "all")
-  const [filterAssignee, setFilterAssignee] = useState(isAdmin ? searchParams.get("assignee") || "all" : "all")
+  const [filterAssignee, setFilterAssignee] = useState(() => {
+    const urlVal = searchParams.get("assignee")
+    return urlVal !== null ? urlVal : userId
+  })
   const [datePreset, setDatePreset] = useState<DatePreset>(validDatePreset(searchParams.get("tanggal")))
   const [dateFrom, setDateFrom] = useState(searchParams.get("from") || "")
   const [dateTo, setDateTo] = useState(searchParams.get("to") || "")
@@ -123,6 +126,30 @@ export function TaskList({
   const [activePeek, setActivePeek] = useState<PeekState>(initialPeek)
   const [renderedPeek, setRenderedPeek] = useState<PeekState>(initialPeek)
   const selectedTaskId = activePeek?.type === "edit" ? activePeek.taskId : null
+
+  const [judulSuggestions, setJudulSuggestions] = useState<string[]>([])
+  useEffect(() => {
+    let active = true
+    async function fetchJudulSuggestions() {
+      const { data } = await supabase
+        .from("tasks")
+        .select("judul")
+        .order("created_at", { ascending: false })
+        .limit(500)
+      if (!active || !data) return
+      const seen = new Set<string>()
+      const list: string[] = []
+      for (const row of data) {
+        if (row.judul && !seen.has(row.judul)) {
+          seen.add(row.judul)
+          list.push(row.judul)
+        }
+      }
+      setJudulSuggestions(list)
+    }
+    fetchJudulSuggestions()
+    return () => { active = false }
+  }, [supabase])
 
   function replaceUrlParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(window.location.search)
@@ -188,18 +215,18 @@ export function TaskList({
 
   function handleAssigneeFilterChange(value: string) {
     setFilterAssignee(value)
-    replaceUrlParams({ assignee: value === "all" ? null : value })
+    replaceUrlParams({ assignee: value })
   }
 
   function resetFilters() {
     setSearch("")
     setFilterStatus("all")
     setFilterKategori("all")
-    setFilterAssignee("all")
+    setFilterAssignee(userId)
     setDatePreset("all")
     setDateFrom("")
     setDateTo("")
-    replaceUrlParams({ status: null, kategori: null, assignee: null, tanggal: null, from: null, to: null })
+    replaceUrlParams({ status: null, kategori: null, assignee: userId, tanggal: null, from: null, to: null })
   }
 
   function matchesDateFilter(date: string) {
@@ -219,7 +246,7 @@ export function TaskList({
     if (!matchesDateFilter(date)) return false
     if (filterStatus !== "all" && task.status !== filterStatus) return false
     if (filterKategori !== "all" && task.kategori !== filterKategori) return false
-    if (isAdmin && filterAssignee !== "all" && task.user_id !== filterAssignee) return false
+    if (filterAssignee !== "all" && task.user_id !== filterAssignee) return false
     if (normalizedSearch && !task.judul.toLowerCase().includes(normalizedSearch)) return false
     return true
   })
@@ -238,7 +265,7 @@ export function TaskList({
     Boolean(search) ||
     filterStatus !== "all" ||
     filterKategori !== "all" ||
-    (isAdmin && filterAssignee !== "all") ||
+    filterAssignee !== userId ||
     datePreset !== "all" ||
     Boolean(dateFrom) ||
     Boolean(dateTo)
@@ -367,18 +394,17 @@ export function TaskList({
                 <option key={item.value} value={item.value}>{item.label}</option>
               ))}
             </select>
-            {isAdmin && (
-              <select
-                className="notion-select w-full lg:w-auto"
-                value={filterAssignee}
-                onChange={(event) => handleAssigneeFilterChange(event.target.value)}
-              >
-                <option value="all">Semua Assignee</option>
-                {profiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>{profile.name}</option>
-                ))}
-              </select>
-            )}
+            <select
+              className="notion-select w-full lg:w-auto"
+              value={filterAssignee}
+              onChange={(event) => handleAssigneeFilterChange(event.target.value)}
+            >
+              <option value="all">Semua</option>
+              <option value={userId}>Saya</option>
+              {isAdmin && profiles.filter((p) => p.id !== userId).map((profile) => (
+                <option key={profile.id} value={profile.id}>{profile.name}</option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -545,6 +571,12 @@ export function TaskList({
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      <datalist id="judul-suggestions">
+        {judulSuggestions.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
     </>
   )
 }
@@ -619,6 +651,7 @@ function FragmentGroup({
                   key={`${task.id}:${task.judul}`}
                   className="task-title-input min-w-0 flex-1"
                   defaultValue={task.judul}
+                  list="judul-suggestions"
                   aria-label={`Judul ${task.judul}`}
                   aria-busy={updatingTitleId === task.id}
                   onClick={(event) => event.stopPropagation()}

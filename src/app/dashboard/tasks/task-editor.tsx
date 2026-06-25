@@ -365,6 +365,32 @@ export function TaskEditor({
       </div>
 
       <div className={panelMode ? "min-h-0 flex-1 space-y-6 overflow-y-auto bg-white px-6 py-5" : "space-y-6"}>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium text-neutral-700">Kategori</label>
+            <select className="notion-select mt-1 w-full" value={kategori} onChange={(e) => setKategori(e.target.value)}>
+              {KATEGORI_LIST.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-neutral-700">KPI Level</label>
+            <select className="notion-select mt-1 w-full" value={kpiLevel} onChange={(e) => setKpiLevel(e.target.value)}>
+              {kpiList.map((item) => (
+                <option key={item.level} value={item.level}>{item.label} (bobot {item.bobot})</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {kpiInfo && (
+          <div className="rounded-md border border-[#e5e5e5] px-4 py-3 text-sm text-neutral-600">
+            Estimasi: <strong>{formatMenit(kpiInfo.estimasi * (Number(kuantitasOutput) || 1))}</strong>
+            {realisasi && <> &middot; Realisasi: <strong>{formatMenit(Number(realisasi))}</strong></>}
+          </div>
+        )}
+
         <div className="relative">
           <label className="text-sm font-medium text-neutral-700">Judul</label>
           <input
@@ -427,25 +453,6 @@ export function TaskEditor({
           <div className="task-person-field mt-1">
             <span className="task-avatar">{(taskCreator?.name || "P").charAt(0).toUpperCase()}</span>
             <span>{taskCreator?.name || "Pengguna"}</span>
-          </div>
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label className="text-sm font-medium text-neutral-700">Kategori</label>
-            <select className="notion-select mt-1 w-full" value={kategori} onChange={(e) => setKategori(e.target.value)}>
-              {KATEGORI_LIST.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-neutral-700">KPI Level</label>
-            <select className="notion-select mt-1 w-full" value={kpiLevel} onChange={(e) => setKpiLevel(e.target.value)}>
-              {kpiList.map((item) => (
-                <option key={item.level} value={item.level}>{item.label} (bobot {item.bobot})</option>
-              ))}
-            </select>
           </div>
         </div>
 

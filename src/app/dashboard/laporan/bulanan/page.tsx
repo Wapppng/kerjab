@@ -361,60 +361,6 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
         )}
       </section>
 
-      <section>
-        <h2 className="mb-3 text-sm font-medium text-neutral-500">Output per Judul</h2>
-        {Object.keys(taskByJudul).length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[#dededb] py-12 text-center text-sm text-neutral-400">
-            Belum ada output selesai pada periode ini.
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {Object.entries(
-              Object.values(taskByJudul).reduce<Record<string, ReportJudulSummary[]>>((groups, entry) => {
-                if (!groups[entry.kategori]) groups[entry.kategori] = []
-                groups[entry.kategori].push(entry)
-                return groups
-              }, {})
-            )
-              .sort(([left], [right]) => left.localeCompare(right))
-              .map(([kategori, entries]) => (
-                <div key={kategori}>
-                  <h3 className="mb-2 text-sm font-semibold capitalize text-neutral-700">{kategori.replaceAll("_", " ")}</h3>
-                  <div className="overflow-x-auto rounded-lg border border-[#e5e5e5]">
-                    <table className="notion-table min-w-[640px]">
-                      <thead>
-                        <tr>
-                          <th>Judul</th>
-                          <th className="text-center">Total Output</th>
-                          {kpiLevels.map((level) => (
-                            <th key={level} className="text-center">L{level}</th>
-                          ))}
-                          <th className="text-center">Total KPI</th>
-                          <th className="text-center">Estimasi</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {entries
-                          .sort((left, right) => right.totalOutput - left.totalOutput)
-                          .map((data) => (
-                            <tr key={`${data.kategori}::${data.judul}`}>
-                              <td className="font-medium max-w-[240px] truncate" title={data.judul}>{data.judul}</td>
-                              <td className="text-center">{data.totalOutput}</td>
-                              {kpiLevels.map((level) => (
-                                <td key={level} className="text-center text-neutral-600">{data.outputByKpiLevel[level] || "-"}</td>
-                              ))}
-                              <td className="text-center font-medium">{data.totalKpi}</td>
-                              <td className="text-center text-neutral-500">{formatMenit(data.totalEstimasi)}</td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
-          </div>
-        )}
-      </section>
     </div>
   )
 }

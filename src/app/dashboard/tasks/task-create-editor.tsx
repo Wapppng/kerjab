@@ -226,9 +226,45 @@ export function TaskCreateEditor({
       </div>
 
       <div className={panelMode ? "flex-1 space-y-6 overflow-y-auto bg-white px-6 py-5" : "space-y-6"}>
-        
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium text-neutral-700">Kategori</label>
+            <select
+              className="notion-select mt-1 w-full"
+              value={form.kategori}
+              onChange={(event) => setForm({ ...form, kategori: event.target.value })}
+              required
+            >
+              <option value="" disabled>Pilih kategori</option>
+              {KATEGORI_LIST.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-neutral-700">KPI Level</label>
+            <select
+              className="notion-select mt-1 w-full"
+              value={form.kpi_level}
+              onChange={(event) => setForm({ ...form, kpi_level: event.target.value })}
+              disabled={kpiLoading}
+              required
+            >
+              <option value="" disabled>{kpiLoading ? "Memuat aturan KPI..." : "Pilih tingkat kesulitan"}</option>
+              {kpiList.map((item) => (
+                <option key={item.level} value={item.level}>{item.label} (bobot {item.bobot})</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {selectedKpi && (
+          <div className="rounded-md border border-[#e5e5e5] px-4 py-3 text-sm text-neutral-600">
+            Estimasi: <strong>{formatMenit(selectedKpi.estimasi * (Number(form.kuantitas_output) || 1))}</strong> &middot; Bobot: {selectedKpi.bobot}
+          </div>
+        )}
+
         <div className="relative">
-          
           <label className="text-sm font-medium text-neutral-700">Judul</label>
           <input
             ref={judulRef}
@@ -297,44 +333,6 @@ export function TaskCreateEditor({
             <span>{currentUserName || "Kamu"}</span>
           </div>
         </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label className="text-sm font-medium text-neutral-700">Kategori</label>
-            <select
-              className="notion-select mt-1 w-full"
-              value={form.kategori}
-              onChange={(event) => setForm({ ...form, kategori: event.target.value })}
-              required
-            >
-              <option value="" disabled>Pilih kategori</option>
-              {KATEGORI_LIST.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-neutral-700">KPI Level</label>
-            <select
-              className="notion-select mt-1 w-full"
-              value={form.kpi_level}
-              onChange={(event) => setForm({ ...form, kpi_level: event.target.value })}
-              disabled={kpiLoading}
-              required
-            >
-              <option value="" disabled>{kpiLoading ? "Memuat aturan KPI..." : "Pilih tingkat kesulitan"}</option>
-              {kpiList.map((item) => (
-                <option key={item.level} value={item.level}>{item.label} (bobot {item.bobot})</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {selectedKpi && (
-          <div className="rounded-md border border-[#e5e5e5] px-4 py-3 text-sm text-neutral-600">
-            Estimasi: <strong>{formatMenit(selectedKpi.estimasi * (Number(form.kuantitas_output) || 1))}</strong> &middot; Bobot: {selectedKpi.bobot}
-          </div>
-        )}
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
