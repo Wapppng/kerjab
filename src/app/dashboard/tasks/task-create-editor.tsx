@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, BarChart3, Calendar, Clock, FileText, Layers, Link as LinkIcon, Plus, Tag, User, UserPlus, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { KATEGORI_LIST, formatMenit, getJakartaDate, getKpiList, toTaskRole, type KpiItem } from "@/lib/utils"
+import { KATEGORI_LIST, cn, formatMenit, getJakartaDate, getKpiList, toTaskRole, type KpiItem } from "@/lib/utils"
 import type { TaskProfile, TaskRole } from "./task-types"
 import NotionEditor from "@/components/tiptap/notion-editor"
 
@@ -189,7 +189,7 @@ export function TaskCreateEditor({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={panelMode ? "flex h-full flex-col" : "max-w-2xl space-y-8"}>
+    <div className={panelMode ? "flex h-full min-h-0 flex-col" : "max-w-2xl space-y-8"}>
       {!panelMode && (
         <Link href="/dashboard/tasks" className="notion-btn w-fit text-sm text-neutral-400 hover:text-neutral-700">
           <ArrowLeft className="h-4 w-4" /> Kembali
@@ -225,7 +225,7 @@ export function TaskCreateEditor({
         </div>
       </div>
 
-      <div className={panelMode ? "flex-1 space-y-6 overflow-y-auto bg-white px-6 py-5" : "space-y-6"}>
+      <form id="task-create-form" onSubmit={handleSubmit} className={panelMode ? "min-h-0 flex-1 space-y-6 overflow-y-auto bg-white px-6 py-5" : "space-y-6"}>
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Tag className="h-3.5 w-3.5 text-neutral-500" />Kategori</label>
@@ -366,16 +366,16 @@ export function TaskCreateEditor({
             {error}
           </p>
         )}
-      </div>
+      </form>
 
-      <div className={panelMode ? "flex gap-2 border-t border-[#e9e9e7] bg-white px-6 py-4" : "flex gap-3 pt-2"}>
-        <button type="submit" className="notion-btn notion-btn-primary" disabled={saving || kpiLoading}>
+      <div className={cn("flex gap-2", panelMode ? "border-t border-[#e9e9e7] bg-white px-6 py-4" : "pt-2")}>
+        <button type="submit" form="task-create-form" className="notion-btn notion-btn-primary" disabled={saving || kpiLoading}>
           {saving ? "Menyimpan..." : "Simpan Task"}
         </button>
         <button type="button" className="notion-btn" onClick={onClose ?? (() => router.back())}>
           Batal
         </button>
       </div>
-    </form>
+    </div>
   )
 }

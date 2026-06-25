@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { toTaskRole } from "@/lib/utils"
 import RoleSettings from "./role-settings"
+import ChangePassword from "./change-password"
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -24,7 +25,7 @@ export default async function SettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Pengaturan</h1>
         <p className="mt-1 text-sm text-neutral-400">
-          Atur role pekerjaan yang menentukan konfigurasi KPI kamu.
+          Atur role pekerjaan dan kelola akun kamu.
         </p>
       </div>
 
@@ -36,6 +37,16 @@ export default async function SettingsPage() {
           </p>
         </div>
         <RoleSettings initialRole={initialRole} />
+      </section>
+
+      <section className="rounded-lg border border-[#e5e5e5] p-6">
+        <div className="mb-6">
+          <h2 className="font-medium text-neutral-900">Ganti Password</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Perbarui password akun kamu.
+          </p>
+        </div>
+        <ChangePassword />
       </section>
     </div>
   )
