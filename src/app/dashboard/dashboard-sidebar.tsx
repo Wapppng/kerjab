@@ -38,8 +38,8 @@ function BrandLogo({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <Image
-        src="/kerjab-icon.png"
-        alt="Kerjab by wapp"
+        src="/keerjab-icon.png"
+        alt="Keerjab by wap"
         width={32}
         height={32}
         className="h-7 w-7 object-contain"
@@ -50,10 +50,10 @@ function BrandLogo({ compact = false }: { compact?: boolean }) {
 
   return (
     <Image
-      src="/kerjab-logo.png"
-      alt="Kerjab by wapp"
-      width={621}
-      height={201}
+      src="/keerjab-logo.png"
+      alt="Keerjab by wap"
+      width={898}
+      height={252}
       className="h-7 w-auto object-contain"
       priority
     />

@@ -30,10 +30,10 @@ export default function LoginPage() {
     <div className="w-full max-w-sm space-y-8">
       <div className="text-center">
         <Image
-          src="/kerjab-logo.png"
-          alt="Kerjab by wapp"
-          width={621}
-          height={201}
+          src="/keerjab-logo.png"
+          alt="Keerjab by wap"
+          width={898}
+          height={252}
           className="mx-auto h-14 w-auto object-contain"
           priority
         />
