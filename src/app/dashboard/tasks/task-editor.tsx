@@ -360,143 +360,166 @@ export function TaskEditor({
         </p>
       </div>
 
-      <div className={panelMode ? "min-h-0 flex-1 space-y-6 overflow-y-auto bg-white px-6 py-5" : "space-y-6"}>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Tag className="h-3.5 w-3.5 text-neutral-500" />Kategori</label>
-            <NotionSelect className="mt-1 w-full" value={kategori} onChange={setKategori} options={KATEGORI_LIST.map((item) => ({ value: item.value, label: item.label }))} />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><BarChart3 className="h-3.5 w-3.5 text-neutral-500" />KPI Level</label>
-            <NotionSelect className="mt-1 w-full" value={kpiLevel} onChange={setKpiLevel} options={kpiList.map((item) => ({ value: String(item.level), label: `${item.label} (bobot ${item.bobot})` }))} />
-          </div>
-        </div>
-
-        {kpiInfo && (
-          <div className="rounded-md border border-[#e5e5e5] px-4 py-3 text-sm text-neutral-600">
-            Estimasi: <strong>{formatMenit(kpiInfo.estimasi * (Number(kuantitasOutput) || 1))}</strong>
-            {realisasi && <> &middot; Realisasi: <strong>{formatMenit(Number(realisasi))}</strong></>}
-          </div>
-        )}
-
-        <div className="relative">
-            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-neutral-500" />Judul</label>
-          <input
-            ref={judulRef}
-            autoFocus={!panelMode}
-            className="notion-input mt-1"
-            value={judul}
-            onChange={(e) => setJudul(e.target.value)}
-            onFocus={() => setShowJudulSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowJudulSuggestions(false), 200)}
-          />
-          {showJudulSuggestions && filteredJudulSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 z-10 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[#e5e5e5] bg-white shadow-lg">
-              {filteredJudulSuggestions.map((suggestion) => (
-                <button
-                  key={suggestion}
-                  type="button"
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-[#f7f7f5]"
-                  onMouseDown={(e) => { e.preventDefault(); setJudul(suggestion); setShowJudulSuggestions(false) }}
-                >
-                  {suggestion}
-                </button>
-              ))}
+      <div className={cn(panelMode ? "min-h-0 flex-1 overflow-y-auto bg-white px-6 py-5" : "")}>
+        <div className="space-y-3">
+          <div className="sm:flex sm:gap-3 sm:items-start">
+            <label className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0"><Tag className="h-3.5 w-3.5 text-neutral-500" />Kategori</label>
+            <div className="flex-1 min-w-0">
+              <NotionSelect className="w-full sm:mt-0" value={kategori} onChange={setKategori} options={KATEGORI_LIST.map((item) => ({ value: item.value, label: item.label }))} />
             </div>
+          </div>
+
+          <div className="sm:flex sm:gap-3 sm:items-start">
+            <label className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0"><BarChart3 className="h-3.5 w-3.5 text-neutral-500" />KPI Level</label>
+            <div className="flex-1 min-w-0">
+              <NotionSelect className="w-full sm:mt-0" value={kpiLevel} onChange={setKpiLevel} options={kpiList.map((item) => ({ value: String(item.level), label: `${item.label} (bobot ${item.bobot})` }))} />
+              {kpiInfo && (
+                <p className="mt-1 text-xs text-neutral-400">
+                  Estimasi: <span className="text-neutral-500">{formatMenit(kpiInfo.estimasi * (Number(kuantitasOutput) || 1))}</span>
+                  {realisasi && <> &middot; Realisasi: <span className="text-neutral-500">{formatMenit(Number(realisasi))}</span></>}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="sm:flex sm:gap-3 sm:items-start">
+            <label className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0"><FileText className="h-3.5 w-3.5 text-neutral-500" />Judul</label>
+            <div className="flex-1 min-w-0 relative">
+              <input
+                ref={judulRef}
+                autoFocus={!panelMode}
+                className="notion-input sm:mt-0"
+                value={judul}
+                onChange={(e) => setJudul(e.target.value)}
+                onFocus={() => setShowJudulSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowJudulSuggestions(false), 200)}
+              />
+              {showJudulSuggestions && filteredJudulSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 z-10 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[#e5e5e5] bg-white shadow-lg">
+                  {filteredJudulSuggestions.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-[#f7f7f5]"
+                      onMouseDown={(e) => { e.preventDefault(); setJudul(suggestion); setShowJudulSuggestions(false) }}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="sm:flex sm:gap-3 sm:items-start">
+            <label className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0"><User className="h-3.5 w-3.5 text-neutral-500" />Assignee</label>
+            <div className="flex-1 min-w-0">
+              <NotionSelect className="w-full sm:mt-0" value={assigneeId} onChange={handleAssigneeChange} options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))} />
+            </div>
+          </div>
+
+          <div className="sm:flex sm:gap-3 sm:items-start">
+            <div className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0"><UserPlus className="h-3.5 w-3.5 text-neutral-500" />Dibuat Oleh</div>
+            <div className="flex-1 min-w-0">
+              <div className="task-person-field sm:mt-0">
+                <span className="task-avatar">{(taskCreator?.name || "P").charAt(0).toUpperCase()}</span>
+                <span>{taskCreator?.name || "Pengguna"}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="sm:grid sm:grid-cols-2 sm:gap-3">
+            <div className="sm:flex sm:gap-3 sm:items-start">
+              <label className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0">
+                <Calendar className="h-3.5 w-3.5 text-neutral-500" />Tanggal</label>
+              <div className="flex-1 min-w-0">
+                <input
+                  type="date"
+                  className="notion-input sm:mt-0"
+                  value={taskDate}
+                  onChange={(event) => setTaskDate(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="sm:flex sm:gap-3 sm:items-start">
+              <label className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0">
+                <Calendar className="h-3.5 w-3.5 text-neutral-500" />Selesai</label>
+              <div className="flex-1 min-w-0">
+                <input
+                  type="datetime-local"
+                  className="notion-input sm:mt-0"
+                  value={waktuTerselesaikan}
+                  onChange={(e) => setWaktuTerselesaikan(e.target.value)}
+                  disabled={status !== "selesai"}
+                />
+                <p className="mt-1 text-xs text-neutral-400">
+                  {status === "selesai" ? "Bisa disesuaikan untuk pekerjaan yang dicatat terlambat." : "Aktif setelah status menjadi Selesai."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="sm:flex sm:gap-3 sm:items-start">
+            <label className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0"><CheckCircle2 className="h-3.5 w-3.5 text-neutral-500" />Status</label>
+            <div className="flex-1 min-w-0">
+              <NotionSelect className="w-full sm:mt-0" value={status} onChange={setStatus} options={STATUS_CONFIG.map((item) => ({ value: item.value, label: item.label, prefix: <span className={`notion-dot ${item.dot}`} />, optionClassName: `${item.bg} ${item.text} rounded-full border-0 font-medium` }))} />
+            </div>
+          </div>
+
+          <div className="sm:grid sm:grid-cols-2 sm:gap-3">
+            <div className="sm:flex sm:gap-3 sm:items-start">
+              <label className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0"><Layers className="h-3.5 w-3.5 text-neutral-500" />Output</label>
+              <div className="flex-1 min-w-0">
+                <input
+                  type="number"
+                  min="1"
+                  className="notion-input sm:mt-0"
+                  placeholder="1"
+                  value={kuantitasOutput}
+                  onChange={(e) => setKuantitasOutput(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="sm:flex sm:gap-3 sm:items-start">
+              <label className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0"><Clock className="h-3.5 w-3.5 text-neutral-500" />Realisasi</label>
+              <div className="flex-1 min-w-0">
+                <input
+                  className="notion-input sm:mt-0"
+                  type="number"
+                  placeholder="120"
+                  value={realisasi}
+                  onChange={(e) => { realisasiTouched.current = true; setRealisasi(e.target.value) }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="sm:flex sm:gap-3 sm:items-start">
+            <label className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0"><LinkIcon className="h-3.5 w-3.5 text-neutral-500" />Link Hasil</label>
+            <div className="flex-1 min-w-0">
+              <input
+                type="url"
+                className="notion-input sm:mt-0"
+                placeholder="https://drive.google.com/..."
+                value={linkHasil}
+                onChange={(e) => setLinkHasil(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="sm:flex sm:gap-3 sm:items-start">
+            <div className="sm:w-[130px] sm:shrink-0 sm:pt-1.5 text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5 mb-1 sm:mb-0"><FileText className="h-3.5 w-3.5 text-neutral-500" />Deskripsi</div>
+            <div className="flex-1 min-w-0">
+              <NotionEditor value={deskripsi} onChange={setDeskripsi} placeholder="Ketik '/' untuk perintah, atau tulis deskripsi..." />
+            </div>
+          </div>
+
+          {error && (
+            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+              {error}
+            </p>
           )}
         </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-neutral-500" />Tanggal Task</label>
-            <input
-              type="date"
-              className="notion-input mt-1"
-              value={taskDate}
-              onChange={(event) => setTaskDate(event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-neutral-500" />Assignee</label>
-            <NotionSelect className="mt-1 w-full" value={assigneeId} onChange={handleAssigneeChange} options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))} />
-          </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><UserPlus className="h-3.5 w-3.5 text-neutral-500" />Dibuat Oleh</label>
-          <div className="task-person-field mt-1">
-            <span className="task-avatar">{(taskCreator?.name || "P").charAt(0).toUpperCase()}</span>
-            <span>{taskCreator?.name || "Pengguna"}</span>
-          </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Layers className="h-3.5 w-3.5 text-neutral-500" />Kuantitas Output</label>
-          <input
-            type="number"
-            min="1"
-            className="notion-input mt-1"
-            placeholder="1"
-            value={kuantitasOutput}
-            onChange={(e) => setKuantitasOutput(e.target.value)}
-          />
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-neutral-500" />Status</label>
-            <NotionSelect className="mt-1 w-full" value={status} onChange={setStatus} options={STATUS_CONFIG.map((item) => ({ value: item.value, label: item.label, prefix: <span className={`notion-dot ${item.dot}`} />, optionClassName: `${item.bg} ${item.text} rounded-full border-0 font-medium` }))} />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-neutral-500" />Realisasi (menit)</label>
-            <input
-              className="notion-input mt-1"
-              type="number"
-              placeholder="120"
-              value={realisasi}
-              onChange={(e) => { realisasiTouched.current = true; setRealisasi(e.target.value) }}
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><LinkIcon className="h-3.5 w-3.5 text-neutral-500" />Link Hasil</label>
-            <input
-              type="url"
-              className="notion-input mt-1"
-              placeholder="https://drive.google.com/..."
-              value={linkHasil}
-              onChange={(e) => setLinkHasil(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-neutral-500" />Waktu Terselesaikan</label>
-            <input
-              type="datetime-local"
-              className="notion-input mt-1"
-              value={waktuTerselesaikan}
-              onChange={(e) => setWaktuTerselesaikan(e.target.value)}
-              disabled={status !== "selesai"}
-            />
-            <p className="mt-1 text-xs text-neutral-400">
-              {status === "selesai" ? "Bisa disesuaikan untuk pekerjaan yang dicatat terlambat." : "Aktif setelah status menjadi Selesai."}
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-neutral-500" />Deskripsi <span className="text-neutral-400 font-normal">(opsional)</span></label>
-          <div className="mt-1">
-            <NotionEditor value={deskripsi} onChange={setDeskripsi} placeholder="Ketik '/' untuk perintah, atau tulis deskripsi..." />
-          </div>
-        </div>
-
-        {error && (
-          <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-            {error}
-          </p>
-        )}
       </div>
 
       <div className={cn("flex gap-2", panelMode ? "border-t border-[#e9e9e7] bg-white px-6 py-4" : "pt-2")}>
