@@ -1,6 +1,4 @@
 import { createClient } from "@/lib/supabase/server"
-import { Plus } from "lucide-react"
-import Link from "next/link"
 import { TaskList } from "./task-list"
 
 export default async function TasksPage() {
@@ -10,38 +8,33 @@ export default async function TasksPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("name, role")
     .eq("id", user.id)
     .single()
 
   const isAdmin = profile?.role === "admin"
+  const userRole = profile?.role === "video_editor" ? "video_editor" : "designer"
 
-  let query = supabase
-    .from("tasks")
-    .select("*, profiles(name)")
-    .order("created_at", { ascending: false })
-
-  if (!isAdmin) query = query.eq("user_id", user.id)
-
-  const { data: tasks } = await query
+  const [tasksResult, profilesResult] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("*, assignee:profiles!tasks_user_id_fkey(id, name, role), creator:profiles!tasks_created_by_fkey(id, name, role)")
+      .order("task_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("profiles")
+      .select("id, name, role")
+      .order("name", { ascending: true }),
+  ])
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Pekerjaan</h1>
-          <p className="mt-1 hidden text-sm text-neutral-400 sm:block">Kelola pekerjaan, status, dan output dalam satu tempat.</p>
-        </div>
-        <Link
-          href="/dashboard/tasks/baru"
-          className="notion-btn notion-btn-primary"
-        >
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Task Baru</span>
-        </Link>
-      </div>
-
-      <TaskList tasks={tasks || []} isAdmin={isAdmin} userId={user.id} />
-    </div>
+    <TaskList
+      tasks={tasksResult.data || []}
+      profiles={profilesResult.data || []}
+      isAdmin={isAdmin}
+      userId={user.id}
+      userName={profile?.name || user.email || "Pengguna"}
+      userRole={userRole}
+    />
   )
 }

@@ -11,7 +11,7 @@ type DashboardTask = {
   kpi_bobot: number | null
   kuantitas_output: number | null
   created_at: string
-  profiles: { name: string }[] | null
+  assignee: { name: string }[] | null
 }
 
 const statusMeta: Record<string, { label: string; dot: string }> = {
@@ -47,7 +47,7 @@ export default async function DashboardPage() {
 
   const isAdmin = profile?.role === "admin"
   const period = currentMonthBoundaries()
-  const fields = "id, judul, kategori, status, kpi_level, kpi_bobot, kuantitas_output, created_at, profiles(name)"
+  const fields = "id, judul, kategori, status, kpi_level, kpi_bobot, kuantitas_output, created_at, assignee:profiles!tasks_user_id_fkey(name)"
 
   let createdQuery = supabase.from("tasks").select(fields).gte("created_at", period.start).lt("created_at", period.end)
   let completedQuery = supabase.from("tasks").select(fields).eq("status", "selesai").gte("waktu_terselesaikan", period.start).lt("waktu_terselesaikan", period.end)
@@ -65,9 +65,9 @@ export default async function DashboardPage() {
     focusQuery,
   ])
 
-  const createdTasks = (createdResult.data || []) as DashboardTask[]
-  const completedTasks = (completedResult.data || []) as DashboardTask[]
-  const focusTasks = (focusResult.data || []) as DashboardTask[]
+  const createdTasks = (createdResult.data || []) as unknown as DashboardTask[]
+  const completedTasks = (completedResult.data || []) as unknown as DashboardTask[]
+  const focusTasks = (focusResult.data || []) as unknown as DashboardTask[]
   const totalKpi = completedTasks.reduce((total, task) => total + (task.kpi_bobot ?? task.kpi_level), 0)
   const totalOutput = completedTasks.reduce((total, task) => total + (task.kuantitas_output || 1), 0)
 
@@ -134,7 +134,7 @@ export default async function DashboardPage() {
                     <span className="block truncate font-medium text-neutral-800">{task.judul}</span>
                     <span className="mt-0.5 block truncate text-xs capitalize text-neutral-400">
                       {task.kategori.replaceAll("_", " ")}
-                      {isAdmin && task.profiles?.[0]?.name ? ` · ${task.profiles[0].name}` : ""}
+                      {isAdmin && task.assignee?.[0]?.name ? ` · ${task.assignee[0].name}` : ""}
                     </span>
                   </span>
                   <span className="hidden text-xs text-neutral-400 sm:block">{meta.label}</span>

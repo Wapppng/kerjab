@@ -50,6 +50,38 @@ export function formatMenit(menit: number | null): string {
   return sisa > 0 ? `${jam}j ${sisa}m` : `${jam} jam`
 }
 
+export const JAKARTA_TIME_ZONE = "Asia/Jakarta"
+
+export function getJakartaDate(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: JAKARTA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
+}
+
+export function shiftTaskDate(date: string, days: number): string {
+  const value = new Date(`${date}T12:00:00+07:00`)
+  value.setUTCDate(value.getUTCDate() + days)
+  return getJakartaDate(value)
+}
+
+export function formatTaskDateLabel(date: string, today = getJakartaDate()): string {
+  if (date === today) return "Hari ini"
+  if (date === shiftTaskDate(today, -1)) return "Kemarin"
+
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: JAKARTA_TIME_ZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${date}T12:00:00+07:00`))
+}
+
 export function getBulanName(bulan: number): string {
   const names = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
