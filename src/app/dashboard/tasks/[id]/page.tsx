@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { toTaskRole } from "@/lib/utils"
 import { TaskEditor, type TaskEditorData } from "../task-editor"
 import type { TaskProfile, TaskRole } from "../task-types"
 
@@ -37,7 +38,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
   }) | null
   const assignee = firstProfile(taskData?.assignee)
   const creator = firstProfile(taskData?.creator)
-  const initialRole: TaskRole = assignee?.role === "video_editor" ? "video_editor" : "designer"
+  const initialRole: TaskRole = toTaskRole(assignee?.role)
 
   return (
     <TaskEditor

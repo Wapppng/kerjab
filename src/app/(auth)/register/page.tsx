@@ -9,7 +9,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<"designer" | "video_editor">("designer")
+  const [role, setRole] = useState<"designer" | "video_editor" | "copywriter">("designer")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -74,11 +74,12 @@ export default function RegisterPage() {
           <select
             className="notion-select mt-1 w-full"
             value={role}
-            onChange={(e) => setRole(e.target.value as "designer" | "video_editor")}
+            onChange={(e) => setRole(e.target.value as "designer" | "video_editor" | "copywriter")}
             required
           >
             <option value="designer">Desain Grafis</option>
             <option value="video_editor">Videografer</option>
+            <option value="copywriter">Copywriter</option>
           </select>
         </div>
 

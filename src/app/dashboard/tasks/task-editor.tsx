@@ -3,10 +3,11 @@
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ChevronDown, ExternalLink, X } from "lucide-react"
+import { ArrowLeft, BarChart3, Calendar, CheckCircle2, ChevronDown, Clock, ExternalLink, FileText, Layers, Link as LinkIcon, Tag, User, UserPlus, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { KATEGORI_LIST, cn, getJakartaDate, getKpiList, formatMenit, formatTaskDateLabel, type KpiItem } from "@/lib/utils"
+import { KATEGORI_LIST, cn, getJakartaDate, getKpiList, formatMenit, formatTaskDateLabel, toTaskRole, type KpiItem } from "@/lib/utils"
 import type { TaskProfile, TaskRole } from "./task-types"
+import NotionEditor from "@/components/tiptap/notion-editor"
 
 export type TaskEditorData = {
   id: string
@@ -162,7 +163,7 @@ export function TaskEditor({
       if (!taskData) return
 
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", taskData.user_id).single()
-      const role = profile?.role === "video_editor" ? "video_editor" : "designer"
+      const role = toTaskRole(profile?.role)
       const { data: config } = await supabase
         .from("kpi_config")
         .select("level, label, bobot, estimasi_waktu_menit")
@@ -213,7 +214,7 @@ export function TaskEditor({
   async function handleAssigneeChange(nextAssigneeId: string) {
     setAssigneeId(nextAssigneeId)
     const nextProfile = profiles.find((profile) => profile.id === nextAssigneeId)
-    const role: TaskRole = nextProfile?.role === "video_editor" ? "video_editor" : "designer"
+    const role: TaskRole = toTaskRole(nextProfile?.role)
     setUserRole(role)
     setKpiList(getKpiList(role))
 
@@ -360,14 +361,14 @@ export function TaskEditor({
           )}
         </div>
         <p className={panelMode ? "mt-2 text-sm text-neutral-400" : "text-sm text-neutral-400"}>
-          KPI mengikuti role {userRole === "designer" ? "Desain Grafis" : "Videografer"}
+          KPI mengikuti role {userRole === "designer" ? "Desain Grafis" : userRole === "video_editor" ? "Videografer" : "Copywriter"}
         </p>
       </div>
 
       <div className={panelMode ? "min-h-0 flex-1 space-y-6 overflow-y-auto bg-white px-6 py-5" : "space-y-6"}>
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-neutral-700">Kategori</label>
+            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Tag className="h-3.5 w-3.5 text-neutral-500" />Kategori</label>
             <select className="notion-select mt-1 w-full" value={kategori} onChange={(e) => setKategori(e.target.value)}>
               {KATEGORI_LIST.map((item) => (
                 <option key={item.value} value={item.value}>{item.label}</option>
@@ -375,7 +376,7 @@ export function TaskEditor({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-neutral-700">KPI Level</label>
+            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><BarChart3 className="h-3.5 w-3.5 text-neutral-500" />KPI Level</label>
             <select className="notion-select mt-1 w-full" value={kpiLevel} onChange={(e) => setKpiLevel(e.target.value)}>
               {kpiList.map((item) => (
                 <option key={item.level} value={item.level}>{item.label} (bobot {item.bobot})</option>
@@ -392,7 +393,7 @@ export function TaskEditor({
         )}
 
         <div className="relative">
-          <label className="text-sm font-medium text-neutral-700">Judul</label>
+            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-neutral-500" />Judul</label>
           <input
             ref={judulRef}
             className="notion-input mt-1"
@@ -419,7 +420,7 @@ export function TaskEditor({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-neutral-700">Tanggal Task</label>
+            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-neutral-500" />Tanggal Task</label>
             <input
               type="date"
               className="notion-input mt-1"
@@ -428,28 +429,21 @@ export function TaskEditor({
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-neutral-700">Assignee</label>
-            {isAdmin ? (
-              <select
-                className="notion-select mt-1 w-full"
-                value={assigneeId}
-                onChange={(event) => handleAssigneeChange(event.target.value)}
-              >
-                {profiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>{profile.name}</option>
-                ))}
-              </select>
-            ) : (
-              <div className="task-person-field mt-1">
-                <span className="task-avatar">{(selectedAssignee?.name || "P").charAt(0).toUpperCase()}</span>
-                <span>{selectedAssignee?.name || "Pengguna"}</span>
-              </div>
-            )}
+            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-neutral-500" />Assignee</label>
+            <select
+              className="notion-select mt-1 w-full"
+              value={assigneeId}
+              onChange={(event) => handleAssigneeChange(event.target.value)}
+            >
+              {profiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>{profile.name}</option>
+              ))}
+            </select>
           </div>
         </div>
 
         <div>
-          <label className="text-sm font-medium text-neutral-700">Dibuat Oleh</label>
+          <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><UserPlus className="h-3.5 w-3.5 text-neutral-500" />Dibuat Oleh</label>
           <div className="task-person-field mt-1">
             <span className="task-avatar">{(taskCreator?.name || "P").charAt(0).toUpperCase()}</span>
             <span>{taskCreator?.name || "Pengguna"}</span>
@@ -464,7 +458,7 @@ export function TaskEditor({
         )}
 
         <div>
-          <label className="text-sm font-medium text-neutral-700">Kuantitas Output</label>
+          <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Layers className="h-3.5 w-3.5 text-neutral-500" />Kuantitas Output</label>
           <input
             type="number"
             min="1"
@@ -477,7 +471,7 @@ export function TaskEditor({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-neutral-700">Status</label>
+            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-neutral-500" />Status</label>
             <select className="notion-select mt-1 w-full" value={status} onChange={(e) => setStatus(e.target.value)}>
               {STATUS_OPTIONS.map((item) => (
                 <option key={item.value} value={item.value}>{item.label}</option>
@@ -485,7 +479,7 @@ export function TaskEditor({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-neutral-700">Realisasi (menit)</label>
+            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-neutral-500" />Realisasi (menit)</label>
             <input
               className="notion-input mt-1"
               type="number"
@@ -498,7 +492,7 @@ export function TaskEditor({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-neutral-700">Link Hasil</label>
+            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><LinkIcon className="h-3.5 w-3.5 text-neutral-500" />Link Hasil</label>
             <input
               type="url"
               className="notion-input mt-1"
@@ -508,7 +502,7 @@ export function TaskEditor({
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-neutral-700">Waktu Terselesaikan</label>
+            <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-neutral-500" />Waktu Terselesaikan</label>
             <input
               type="datetime-local"
               className="notion-input mt-1"
@@ -523,12 +517,10 @@ export function TaskEditor({
         </div>
 
         <div>
-          <label className="text-sm font-medium text-neutral-700">Deskripsi <span className="text-neutral-400 font-normal">(opsional)</span></label>
-          <textarea
-            className="notion-input mt-1 min-h-[100px] resize-y"
-            value={deskripsi}
-            onChange={(e) => setDeskripsi(e.target.value)}
-          />
+          <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-neutral-500" />Deskripsi <span className="text-neutral-400 font-normal">(opsional)</span></label>
+          <div className="mt-1">
+            <NotionEditor value={deskripsi} onChange={setDeskripsi} placeholder="Ketik '/' untuk perintah, atau tulis deskripsi..." />
+          </div>
         </div>
 
         {error && (

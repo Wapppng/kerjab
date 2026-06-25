@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { toTaskRole } from "@/lib/utils"
 import { TaskCreateEditor } from "../task-create-editor"
 import type { TaskRole } from "../task-types"
 
@@ -14,7 +15,7 @@ export default async function NewTaskPage() {
     .single()
 
   const isAdmin = profile?.role === "admin"
-  const userRole: TaskRole = profile?.role === "video_editor" ? "video_editor" : "designer"
+  const userRole: TaskRole = toTaskRole(profile?.role)
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, name, role")

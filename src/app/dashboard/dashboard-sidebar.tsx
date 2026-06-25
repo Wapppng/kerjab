@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -13,6 +14,7 @@ import {
   PanelLeftOpen,
   Settings,
   UserRoundCog,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react"
@@ -29,6 +31,33 @@ const roleLabels: Record<string, string> = {
   admin: "Administrator",
   designer: "Desain Grafis",
   video_editor: "Videografer",
+  copywriter: "Copywriter",
+}
+
+function BrandLogo({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <Image
+        src="/kerjab-icon.png"
+        alt="Kerjab by wapp"
+        width={32}
+        height={32}
+        className="h-7 w-7 object-contain"
+        priority
+      />
+    )
+  }
+
+  return (
+    <Image
+      src="/kerjab-logo.png"
+      alt="Kerjab by wapp"
+      width={621}
+      height={201}
+      className="h-7 w-auto object-contain"
+      priority
+    />
+  )
 }
 
 type NavItem = {
@@ -40,7 +69,7 @@ type NavItem = {
 function SidebarNavigation({
   compact,
   navItems,
-  settingsItem,
+  settingsItems,
   pathname,
   profileName,
   profileRole,
@@ -49,7 +78,7 @@ function SidebarNavigation({
 }: {
   compact: boolean
   navItems: NavItem[]
-  settingsItem: NavItem
+  settingsItems: NavItem[]
   pathname: string
   profileName: string
   profileRole: string
@@ -82,16 +111,7 @@ function SidebarNavigation({
       </nav>
 
       <div className="border-t border-[#e9e9e7] p-2">
-        <Link
-          href={settingsItem.href}
-          title={compact ? settingsItem.label : undefined}
-          onClick={onNavigate}
-          className={cn(
-            "mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-[#00000008]",
-            compact && "justify-center px-0",
-            isActive(settingsItem.href) && "bg-[#00000008]"
-          )}
-        >
+        <div className="mb-1 flex items-center gap-2 rounded-md px-2 py-1.5">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white text-xs font-semibold text-neutral-600 shadow-sm ring-1 ring-black/5">
             {profileName.charAt(0).toUpperCase()}
           </span>
@@ -101,8 +121,23 @@ function SidebarNavigation({
               <span className="block truncate text-[11px] text-neutral-400">{roleLabels[profileRole] || profileRole}</span>
             </span>
           )}
-          <settingsItem.icon className={cn("h-4 w-4 shrink-0 text-neutral-400", compact && "hidden")} />
-        </Link>
+        </div>
+        {settingsItems.map(({ href, label, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            title={compact ? label : undefined}
+            onClick={onNavigate}
+            className={cn(
+              "notion-sidebar-item mb-0.5 min-h-7",
+              compact && "justify-center px-2",
+              isActive(href) && "active font-medium"
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0 opacity-60" />
+            {!compact && <span className="truncate">{label}</span>}
+          </Link>
+        ))}
         <button
           type="button"
           onClick={onLogout}
@@ -130,9 +165,14 @@ export default function DashboardSidebar({ isAdmin, profileName, profileRole }: 
     { href: "/dashboard/laporan/bulanan", label: "Laporan", icon: BarChart3 },
   ]
 
-  const settingsItem: NavItem = isAdmin
-    ? { href: "/dashboard/admin/kpi", label: "Aturan KPI", icon: Settings }
-    : { href: "/dashboard/pengaturan", label: "Pengaturan", icon: UserRoundCog }
+  const settingsItems: NavItem[] = isAdmin
+    ? [
+        { href: "/dashboard/admin/users", label: "Pengguna", icon: Users },
+        { href: "/dashboard/admin/kpi", label: "Aturan KPI", icon: Settings },
+      ]
+    : [
+        { href: "/dashboard/pengaturan", label: "Pengaturan", icon: UserRoundCog },
+      ]
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -146,7 +186,7 @@ export default function DashboardSidebar({ isAdmin, profileName, profileRole }: 
         <button type="button" className="notion-btn p-1.5" onClick={() => setMobileOpen(true)} aria-label="Buka navigasi">
           <Menu className="h-5 w-5" />
         </button>
-        <span className="text-sm font-semibold tracking-tight">Kerjab</span>
+        <BrandLogo />
       </header>
 
       {mobileOpen && (
@@ -154,7 +194,7 @@ export default function DashboardSidebar({ isAdmin, profileName, profileRole }: 
           <button type="button" className="absolute inset-0 bg-black/20" onClick={() => setMobileOpen(false)} aria-label="Tutup navigasi" />
           <aside className="notion-sidebar relative flex h-full w-[min(88vw,280px)] flex-col border-r border-[#e9e9e7] shadow-xl">
             <div className="flex h-12 items-center justify-between px-4">
-              <span className="text-sm font-semibold tracking-tight">Kerjab</span>
+              <BrandLogo />
               <button type="button" className="notion-btn p-1.5" onClick={() => setMobileOpen(false)} aria-label="Tutup navigasi">
                 <X className="h-4 w-4" />
               </button>
@@ -162,7 +202,7 @@ export default function DashboardSidebar({ isAdmin, profileName, profileRole }: 
             <SidebarNavigation
               compact={false}
               navItems={navItems}
-              settingsItem={settingsItem}
+              settingsItems={settingsItems}
               pathname={pathname}
               profileName={profileName}
               profileRole={profileRole}
@@ -178,7 +218,9 @@ export default function DashboardSidebar({ isAdmin, profileName, profileRole }: 
         collapsed ? "w-16" : "w-60"
       )}>
         <div className={cn("flex h-12 items-center px-3", collapsed ? "justify-center" : "justify-between")}>
-          {!collapsed && <span className="px-1 text-sm font-semibold tracking-tight">Kerjab</span>}
+          <div className={cn("flex min-w-0 items-center", !collapsed && "px-1")}>
+            <BrandLogo compact={collapsed} />
+          </div>
           <button
             type="button"
             className="notion-btn p-1.5 text-neutral-400"
@@ -192,7 +234,7 @@ export default function DashboardSidebar({ isAdmin, profileName, profileRole }: 
         <SidebarNavigation
           compact={collapsed}
           navItems={navItems}
-          settingsItem={settingsItem}
+          settingsItems={settingsItems}
           pathname={pathname}
           profileName={profileName}
           profileRole={profileRole}

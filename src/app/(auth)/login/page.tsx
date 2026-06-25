@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
@@ -28,7 +29,14 @@ export default function LoginPage() {
   return (
     <div className="w-full max-w-sm space-y-8">
       <div className="text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Kerjab</h1>
+        <Image
+          src="/kerjab-logo.png"
+          alt="Kerjab by wapp"
+          width={621}
+          height={201}
+          className="mx-auto h-14 w-auto object-contain"
+          priority
+        />
         <p className="mt-1 text-sm text-neutral-400">Masuk ke akun kamu</p>
       </div>
 

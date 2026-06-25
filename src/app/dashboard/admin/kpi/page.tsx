@@ -3,6 +3,18 @@ import { redirect } from "next/navigation"
 import { KPI_LIST, KPI_LIST_VIDEO } from "@/lib/utils"
 import { KpiSettings } from "./kpi-settings"
 
+const KPI_FALLBACKS: Record<string, readonly { level: number; label: string; bobot: number; estimasi: number }[]> = {
+  designer: KPI_LIST,
+  video_editor: KPI_LIST_VIDEO,
+  copywriter: KPI_LIST,
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  designer: "Desainer Grafis",
+  video_editor: "Video Editor",
+  copywriter: "Copywriter",
+}
+
 export default async function AdminKpiPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -21,28 +33,31 @@ export default async function AdminKpiPage() {
     .select("*")
     .order("level", { ascending: true })
 
-  console.log("📊 KPI Config dari DB:", kpiConfig)
+  const roleKeys = ["designer", "video_editor", "copywriter"] as const
 
-  const hasRoleColumn = kpiConfig && kpiConfig.length > 0 && "role" in kpiConfig[0]
-  console.log("✅ Has Role Column:", hasRoleColumn)
+  const configByRole: Record<string, { level: number; role: string; label: string; bobot: number; estimasi_waktu_menit: number }[]> = {}
 
-  // Filter data dari database, atau gunakan fallback jika kosong
-  const designerFromDb = kpiConfig?.filter((k) => k.role === "designer") ?? []
-  const videoFromDb = kpiConfig?.filter((k) => k.role === "video_editor") ?? []
-
-  console.log("👨‍🎨 Designer dari DB:", designerFromDb)
-  console.log("🎬 Video Editor dari DB:", videoFromDb)
-
-  const designerConfig = designerFromDb.length > 0
-    ? designerFromDb.map((k) => ({ level: k.level, role: k.role, label: k.label, bobot: k.bobot, estimasi_waktu_menit: k.estimasi_waktu_menit }))
-    : KPI_LIST.map((k) => ({ level: k.level, role: "designer" as const, label: k.label, bobot: k.bobot, estimasi_waktu_menit: k.estimasi }))
-
-  const videoConfig = videoFromDb.length > 0
-    ? videoFromDb.map((k) => ({ level: k.level, role: k.role, label: k.label, bobot: k.bobot, estimasi_waktu_menit: k.estimasi_waktu_menit }))
-    : KPI_LIST_VIDEO.map((k) => ({ level: k.level, role: "video_editor" as const, label: k.label, bobot: k.bobot, estimasi_waktu_menit: k.estimasi }))
-
-  console.log("📋 Designer Config untuk UI:", designerConfig)
-  console.log("📋 Video Config untuk UI:", videoConfig)
+  for (const key of roleKeys) {
+    const fromDb = kpiConfig?.filter((k) => k.role === key) ?? []
+    if (fromDb.length > 0) {
+      configByRole[key] = fromDb.map((k) => ({
+        level: k.level,
+        role: k.role,
+        label: k.label,
+        bobot: k.bobot,
+        estimasi_waktu_menit: k.estimasi_waktu_menit,
+      }))
+    } else {
+      const fallback = KPI_FALLBACKS[key]
+      configByRole[key] = fallback.map((k) => ({
+        level: k.level,
+        role: key,
+        label: k.label,
+        bobot: k.bobot,
+        estimasi_waktu_menit: k.estimasi,
+      }))
+    }
+  }
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -50,7 +65,7 @@ export default async function AdminKpiPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Pengaturan KPI</h1>
         <p className="mt-1 text-sm text-neutral-400">Konfigurasi level KPI dan estimasi waktu per role</p>
       </div>
-      <KpiSettings designerData={designerConfig} videoData={videoConfig} />
+      <KpiSettings configByRole={configByRole} roleKeys={[...roleKeys]} roleLabels={ROLE_LABELS} />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { type TaskRole } from "@/app/dashboard/tasks/task-types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -40,6 +41,11 @@ export const KPI_LIST_VIDEO: readonly KpiItem[] = [
 
 export function getKpiList(role?: string | null): readonly KpiItem[] {
   return role === "video_editor" ? KPI_LIST_VIDEO : KPI_LIST
+}
+
+export function toTaskRole(role: string | undefined | null): TaskRole {
+  if (role === "video_editor" || role === "copywriter") return role
+  return "designer"
 }
 
 export function formatMenit(menit: number | null): string {

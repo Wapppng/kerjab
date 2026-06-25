@@ -25,6 +25,7 @@ ON CONFLICT (level, role) DO NOTHING;
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  email TEXT,
   role TEXT NOT NULL CHECK (role IN ('admin', 'designer', 'video_editor')) DEFAULT 'designer',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -146,14 +147,15 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = ''
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, name, role)
+  INSERT INTO public.profiles (id, name, role, email)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', 'Unknown'),
     CASE
       WHEN NEW.raw_user_meta_data->>'role' = 'video_editor' THEN 'video_editor'
       ELSE 'designer'
-    END
+    END,
+    NEW.email
   );
   RETURN NEW;
 END;

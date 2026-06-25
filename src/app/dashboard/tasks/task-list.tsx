@@ -9,6 +9,7 @@ import {
   formatTaskDateLabel,
   getJakartaDate,
   shiftTaskDate,
+  toTaskRole,
 } from "@/lib/utils"
 import {
   CalendarDays,
@@ -342,7 +343,7 @@ export function TaskList({
   const renderedTask = tasks.find((task) => task.id === renderedTaskId)
   const renderedAssignee = firstProfile(renderedTask?.assignee)
   const renderedCreator = firstProfile(renderedTask?.creator)
-  const renderedTaskRole = renderedAssignee?.role === "video_editor" ? "video_editor" : "designer"
+  const renderedTaskRole = toTaskRole(renderedAssignee?.role)
 
   return (
     <>

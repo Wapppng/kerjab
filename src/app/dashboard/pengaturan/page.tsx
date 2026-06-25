@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { toTaskRole } from "@/lib/utils"
 import RoleSettings from "./role-settings"
 
 export default async function SettingsPage() {
@@ -16,7 +17,7 @@ export default async function SettingsPage() {
 
   if (profile?.role === "admin") redirect("/dashboard")
 
-  const initialRole = profile?.role === "video_editor" ? "video_editor" : "designer"
+  const initialRole = toTaskRole(profile?.role)
 
   return (
     <div className="max-w-2xl space-y-8">

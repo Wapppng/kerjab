@@ -8,7 +8,7 @@ export type RoleFormState = {
   message: string
 }
 
-const allowedRoles = ["designer", "video_editor"] as const
+const allowedRoles = ["designer", "video_editor", "copywriter"] as const
 
 export async function updateRole(
   _previousState: RoleFormState,
@@ -55,6 +55,6 @@ export async function updateRole(
   revalidatePath("/dashboard")
   revalidatePath("/dashboard/pengaturan")
 
-  const roleLabel = role === "designer" ? "Desain Grafis" : "Videografer"
+  const roleLabel = role === "designer" ? "Desain Grafis" : role === "video_editor" ? "Videografer" : "Copywriter"
   return { status: "success", message: `Role berhasil diubah menjadi ${roleLabel}.` }
 }

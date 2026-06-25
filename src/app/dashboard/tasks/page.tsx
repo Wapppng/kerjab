@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { toTaskRole } from "@/lib/utils"
 import { TaskList } from "./task-list"
 
 export const dynamic = "force-dynamic"
@@ -16,7 +17,7 @@ export default async function TasksPage() {
     .single()
 
   const isAdmin = profile?.role === "admin"
-  const userRole = profile?.role === "video_editor" ? "video_editor" : "designer"
+  const userRole = toTaskRole(profile?.role)
 
   const serviceClient = createServiceClient()
   const [tasksResult, profilesResult] = await Promise.all([

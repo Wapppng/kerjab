@@ -1,11 +1,11 @@
 "use client"
 
 import { useActionState } from "react"
-import { Palette, Video } from "lucide-react"
+import { Palette, Video, FilePenLine } from "lucide-react"
 import { updateRole, type RoleFormState } from "./actions"
 
 type RoleSettingsProps = {
-  initialRole: "designer" | "video_editor"
+  initialRole: "designer" | "video_editor" | "copywriter"
 }
 
 const initialState: RoleFormState = {
@@ -25,6 +25,12 @@ const roles = [
     label: "Videografer",
     description: "Untuk produksi, penyuntingan, dan konten video.",
     icon: Video,
+  },
+  {
+    value: "copywriter",
+    label: "Copywriter",
+    description: "Untuk penulisan konten, artikel, dan materi copy.",
+    icon: FilePenLine,
   },
 ] as const
 

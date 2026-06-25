@@ -12,54 +12,50 @@ type KpiConfig = {
   estimasi_waktu_menit: number
 }
 
-const ROLES = [
-  { key: "designer", label: "Desainer Grafis" },
-  { key: "video_editor", label: "Video Editor" },
-] as const
-
 const LABELS = ["Sangat Mudah", "Mudah", "Sedang", "Sulit", "Sangat Sulit"]
 
-export function KpiSettings({ designerData, videoData }: { designerData: KpiConfig[]; videoData: KpiConfig[] }) {
+export function KpiSettings({
+  configByRole,
+  roleKeys,
+  roleLabels,
+}: {
+  configByRole: Record<string, KpiConfig[]>
+  roleKeys: string[]
+  roleLabels: Record<string, string>
+}) {
   const router = useRouter()
   const supabase = createClient()
-  const [tab, setTab] = useState<"designer" | "video_editor">("designer")
-  const [designer, setDesigner] = useState<KpiConfig[]>(designerData)
-  const [video, setVideo] = useState<KpiConfig[]>(videoData)
+  const [tab, setTab] = useState<string>(roleKeys[0])
+  const [configs, setConfigs] = useState<Record<string, KpiConfig[]>>(configByRole)
   const [saving, setSaving] = useState(false)
 
-  const current = tab === "designer" ? designer : video
-  const setCurrent = tab === "designer" ? setDesigner : setVideo
+  const current = configs[tab] ?? []
+  const firstTab = roleKeys[0]
 
   function update(level: number, field: keyof KpiConfig, value: string | number) {
-    setCurrent((prev) => prev.map((item) => item.level === level ? { ...item, [field]: value } : item))
+    setConfigs((prev) => ({
+      ...prev,
+      [tab]: prev[tab]?.map((item) => item.level === level ? { ...item, [field]: value } : item) ?? [],
+    }))
   }
 
   async function handleSave() {
     setSaving(true)
     try {
-      const data = tab === "designer" ? designer : video
+      const data = configs[tab] ?? []
       const dataToSave = data.map((item) => ({ ...item, role: tab }))
-      
-      console.log("Saving data:", dataToSave)
-      
-      // Batch upsert - 1 request untuk semua items
-      const { data: response, error } = await supabase.from("kpi_config").upsert(dataToSave)
-      
-      console.log("Response:", response)
-      console.log("Error:", error)
-      
+
+      const { error } = await supabase.from("kpi_config").upsert(dataToSave)
+
       if (error) {
-        const errorMsg = error?.message || JSON.stringify(error) || "Unknown error"
-        alert(`Gagal menyimpan: ${errorMsg}`)
+        alert(`Gagal menyimpan: ${error.message || JSON.stringify(error)}`)
         return
       }
-      
+
       alert("Pengaturan KPI berhasil disimpan!")
       router.refresh()
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : JSON.stringify(err)
-      alert(`Error: ${errorMsg}`)
-      console.error("Save error:", err)
+      alert(`Error: ${err instanceof Error ? err.message : JSON.stringify(err)}`)
     } finally {
       setSaving(false)
     }
@@ -68,15 +64,15 @@ export function KpiSettings({ designerData, videoData }: { designerData: KpiConf
   return (
     <div className="space-y-6">
       <div className="flex gap-1 rounded-lg border border-[#e5e5e5] p-1">
-        {ROLES.map((r) => (
+        {roleKeys.map((key) => (
           <button
-            key={r.key}
-            onClick={() => setTab(r.key)}
+            key={key}
+            onClick={() => setTab(key)}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
-              tab === r.key ? "bg-[#37352f] text-white" : "text-neutral-500 hover:text-neutral-800"
+              tab === key ? "bg-[#37352f] text-white" : "text-neutral-500 hover:text-neutral-800"
             }`}
           >
-            {r.label}
+            {roleLabels[key] ?? key}
           </button>
         ))}
       </div>
@@ -120,7 +116,7 @@ export function KpiSettings({ designerData, videoData }: { designerData: KpiConf
       </div>
 
       <button className="notion-btn notion-btn-primary w-full justify-center" onClick={handleSave} disabled={saving}>
-        {saving ? "Menyimpan..." : `Simpan Pengaturan KPI ${tab === "designer" ? "Desainer" : "Video Editor"}`}
+        {saving ? "Menyimpan..." : `Simpan Pengaturan KPI ${roleLabels[tab] ?? tab}`}
       </button>
     </div>
   )
