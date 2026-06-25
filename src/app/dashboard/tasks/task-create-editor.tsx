@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Plus, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -48,6 +48,34 @@ export function TaskCreateEditor({
   })
   const [taskDate, setTaskDate] = useState(initialDate ?? getJakartaDate())
   const [assigneeId, setAssigneeId] = useState(currentUserId ?? "")
+  const [judulSuggestions, setJudulSuggestions] = useState<Record<string, string[]>>({})
+  const [showJudulSuggestions, setShowJudulSuggestions] = useState(false)
+  const judulRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    let active = true
+    async function fetchJudulSuggestions() {
+      const { data } = await supabase
+        .from("tasks")
+        .select("judul, kategori")
+        .order("created_at", { ascending: false })
+        .limit(500)
+      if (!active || !data) return
+      const map: Record<string, string[]> = {}
+      for (const row of data) {
+        const cat = row.kategori || ""
+        if (!map[cat]) map[cat] = []
+        if (!map[cat].includes(row.judul)) map[cat].push(row.judul)
+      }
+      setJudulSuggestions(map)
+    }
+    fetchJudulSuggestions()
+    return () => { active = false }
+  }, [supabase])
+
+  const filteredJudulSuggestions = form.kategori && judulSuggestions[form.kategori]
+    ? judulSuggestions[form.kategori].filter((s) => !form.judul || s.toLowerCase().includes(form.judul.toLowerCase()))
+    : []
 
   useEffect(() => {
     let active = true
@@ -157,7 +185,7 @@ export function TaskCreateEditor({
       return
     }
 
-    router.replace("/dashboard/tasks")
+    window.location.href = "/dashboard/tasks"
   }
 
   return (
@@ -198,16 +226,35 @@ export function TaskCreateEditor({
       </div>
 
       <div className={panelMode ? "flex-1 space-y-6 overflow-y-auto bg-white px-6 py-5" : "space-y-6"}>
-        <div>
+        
+        <div className="relative">
+          
           <label className="text-sm font-medium text-neutral-700">Judul</label>
           <input
+            ref={judulRef}
             autoFocus={panelMode}
             className="notion-input mt-1"
             placeholder="Contoh: Buat feed campaign Q3"
             value={form.judul}
             onChange={(event) => setForm({ ...form, judul: event.target.value })}
+            onFocus={() => setShowJudulSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowJudulSuggestions(false), 200)}
             required
           />
+          {showJudulSuggestions && filteredJudulSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 z-10 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[#e5e5e5] bg-white shadow-lg">
+              {filteredJudulSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-[#f7f7f5]"
+                  onMouseDown={(e) => { e.preventDefault(); setForm({ ...form, judul: suggestion }); setShowJudulSuggestions(false) }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -251,16 +298,6 @@ export function TaskCreateEditor({
           </div>
         </div>
 
-        <div>
-          <label className="text-sm font-medium text-neutral-700">Deskripsi</label>
-          <textarea
-            className="notion-input mt-1 min-h-[100px] resize-y"
-            placeholder="Detail tugas (opsional)"
-            value={form.deskripsi}
-            onChange={(event) => setForm({ ...form, deskripsi: event.target.value })}
-          />
-        </div>
-
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="text-sm font-medium text-neutral-700">Kategori</label>
@@ -295,7 +332,7 @@ export function TaskCreateEditor({
 
         {selectedKpi && (
           <div className="rounded-md border border-[#e5e5e5] px-4 py-3 text-sm text-neutral-600">
-            Estimasi: <strong>{formatMenit(selectedKpi.estimasi)}</strong> &middot; Bobot: {selectedKpi.bobot}
+            Estimasi: <strong>{formatMenit(selectedKpi.estimasi * (Number(form.kuantitas_output) || 1))}</strong> &middot; Bobot: {selectedKpi.bobot}
           </div>
         )}
 
@@ -325,6 +362,16 @@ export function TaskCreateEditor({
         <p className="text-xs text-neutral-400">
           Waktu selesai dicatat otomatis ketika status task diubah menjadi Selesai.
         </p>
+
+        <div>
+          <label className="text-sm font-medium text-neutral-700">Deskripsi <span className="text-neutral-400 font-normal">(opsional)</span></label>
+          <textarea
+            className="notion-input mt-1 min-h-[100px] resize-y"
+            placeholder="Detail tugas (opsional)"
+            value={form.deskripsi}
+            onChange={(event) => setForm({ ...form, deskripsi: event.target.value })}
+          />
+        </div>
 
         {error && (
           <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">

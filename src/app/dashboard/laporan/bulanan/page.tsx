@@ -3,7 +3,7 @@ import { CalendarRange, Filter, RotateCcw } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { formatMenit, getBulanName, KATEGORI_LIST } from "@/lib/utils"
 import { LaporanClient } from "./laporan-client"
-import type { ReportCategorySummary, ReportUserSummary } from "./laporan-types"
+import type { ReportCategorySummary, ReportJudulSummary, ReportUserSummary } from "./laporan-types"
 
 type ReportSearchParams = Promise<{
   bulan?: string | string[]
@@ -19,6 +19,7 @@ type ProfileOption = {
 
 type ReportTask = {
   user_id: string
+  judul: string
   kategori: string
   kpi_level: number
   kpi_bobot: number | null
@@ -88,13 +89,13 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
 
   let createdQuery = supabase
     .from("tasks")
-    .select("user_id, kategori, kpi_level, kpi_bobot, estimasi_waktu_menit, realisasi_waktu_menit, kuantitas_output, assignee:profiles!tasks_user_id_fkey(name)")
+    .select("user_id, judul, kategori, kpi_level, kpi_bobot, estimasi_waktu_menit, realisasi_waktu_menit, kuantitas_output, assignee:profiles!tasks_user_id_fkey(name)")
     .gte("created_at", period.start)
     .lt("created_at", period.end)
 
   let completedQuery = supabase
     .from("tasks")
-    .select("user_id, kategori, kpi_level, kpi_bobot, estimasi_waktu_menit, realisasi_waktu_menit, kuantitas_output, assignee:profiles!tasks_user_id_fkey(name)")
+    .select("user_id, judul, kategori, kpi_level, kpi_bobot, estimasi_waktu_menit, realisasi_waktu_menit, kuantitas_output, assignee:profiles!tasks_user_id_fkey(name)")
     .eq("status", "selesai")
     .gte("waktu_terselesaikan", period.start)
     .lt("waktu_terselesaikan", period.end)
@@ -143,6 +144,43 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
     taskByCategory[task.kategori].totalOutput += output
   }
 
+  const kpiLevelSet = new Set<number>()
+
+  const taskByJudul: Record<string, ReportJudulSummary> = {}
+  for (const task of completedTasks) {
+    const output = task.kuantitas_output || 1
+    const key = `${task.kategori}::${task.judul}`
+    if (!taskByJudul[key]) {
+      taskByJudul[key] = {
+        judul: task.judul,
+        kategori: task.kategori,
+        totalTasks: 0,
+        totalEstimasi: 0,
+        totalRealisasi: 0,
+        totalKpi: 0,
+        totalOutput: 0,
+        outputByKpiLevel: {},
+      }
+    }
+    taskByJudul[key].totalTasks += 1
+    taskByJudul[key].totalEstimasi += task.estimasi_waktu_menit * output
+    taskByJudul[key].totalRealisasi += task.realisasi_waktu_menit || 0
+    taskByJudul[key].totalKpi += task.kpi_bobot ?? task.kpi_level
+    taskByJudul[key].totalOutput += output
+    taskByJudul[key].outputByKpiLevel[task.kpi_level] = (taskByJudul[key].outputByKpiLevel[task.kpi_level] || 0) + output
+    kpiLevelSet.add(task.kpi_level)
+  }
+
+  const kpiLevels = Array.from(kpiLevelSet).sort((a, b) => a - b)
+
+  const outputByKpiLevel: Record<number, number> = {}
+  const kpiScoreByKpiLevel: Record<number, number> = {}
+  for (const task of completedTasks) {
+    const output = task.kuantitas_output || 1
+    outputByKpiLevel[task.kpi_level] = (outputByKpiLevel[task.kpi_level] || 0) + output
+    kpiScoreByKpiLevel[task.kpi_level] = (kpiScoreByKpiLevel[task.kpi_level] || 0) + (task.kpi_bobot ?? task.kpi_level)
+  }
+
   for (const summary of Object.values(taskByUser)) {
     summary.rasioRealisasi = summary.totalEstimasi > 0 ? summary.totalRealisasi / summary.totalEstimasi : 0
   }
@@ -152,6 +190,19 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
 
   const totalKpi = completedTasks.reduce((total, task) => total + (task.kpi_bobot ?? task.kpi_level), 0)
   const totalOutput = completedTasks.reduce((total, task) => total + (task.kuantitas_output || 1), 0)
+  const totalEstimasiMenit = completedTasks.reduce((total, task) => total + task.estimasi_waktu_menit * (task.kuantitas_output || 1), 0)
+  const totalRealisasiMenit = completedTasks.reduce((total, task) => total + (task.realisasi_waktu_menit || 0), 0)
+
+  // hitung hari kerja (Sen-Jum=1, Sab=0.5) dalam bulan ini
+  let workingDays = 0
+  const daysInMonth = new Date(year, month, 0).getDate()
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayOfWeek = new Date(year, month - 1, d).getDay()
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) workingDays += 1
+    else if (dayOfWeek === 6) workingDays += 0.5
+  }
+  const avgEstimasiJamPerHari = workingDays > 0 ? totalEstimasiMenit / 60 / workingDays : 0
+
   const years = Array.from({ length: 6 }, (_, index) => now.getFullYear() + 1 - index)
   if (!years.includes(year)) years.push(year)
   years.sort((left, right) => right - left)
@@ -229,6 +280,14 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
       <LaporanClient 
         taskByUser={taskByUser} 
         taskByCategory={taskByCategory} 
+        taskByJudul={taskByJudul}
+        kpiLevels={kpiLevels}
+        outputByKpiLevel={outputByKpiLevel}
+        kpiScoreByKpiLevel={kpiScoreByKpiLevel}
+        totalEstimasiMenit={totalEstimasiMenit}
+        totalRealisasiMenit={totalRealisasiMenit}
+        avgEstimasiJamPerHari={avgEstimasiJamPerHari}
+        workingDays={workingDays}
         month={month} 
         year={year}
         overallRasioRealisasi={overallRasioRealisasi}
@@ -298,6 +357,61 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
                   ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-medium text-neutral-500">Output per Judul</h2>
+        {Object.keys(taskByJudul).length === 0 ? (
+          <div className="rounded-lg border border-dashed border-[#dededb] py-12 text-center text-sm text-neutral-400">
+            Belum ada output selesai pada periode ini.
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(
+              Object.values(taskByJudul).reduce<Record<string, ReportJudulSummary[]>>((groups, entry) => {
+                if (!groups[entry.kategori]) groups[entry.kategori] = []
+                groups[entry.kategori].push(entry)
+                return groups
+              }, {})
+            )
+              .sort(([left], [right]) => left.localeCompare(right))
+              .map(([kategori, entries]) => (
+                <div key={kategori}>
+                  <h3 className="mb-2 text-sm font-semibold capitalize text-neutral-700">{kategori.replaceAll("_", " ")}</h3>
+                  <div className="overflow-x-auto rounded-lg border border-[#e5e5e5]">
+                    <table className="notion-table min-w-[640px]">
+                      <thead>
+                        <tr>
+                          <th>Judul</th>
+                          <th className="text-center">Total Output</th>
+                          {kpiLevels.map((level) => (
+                            <th key={level} className="text-center">L{level}</th>
+                          ))}
+                          <th className="text-center">Total KPI</th>
+                          <th className="text-center">Estimasi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entries
+                          .sort((left, right) => right.totalOutput - left.totalOutput)
+                          .map((data) => (
+                            <tr key={`${data.kategori}::${data.judul}`}>
+                              <td className="font-medium max-w-[240px] truncate" title={data.judul}>{data.judul}</td>
+                              <td className="text-center">{data.totalOutput}</td>
+                              {kpiLevels.map((level) => (
+                                <td key={level} className="text-center text-neutral-600">{data.outputByKpiLevel[level] || "-"}</td>
+                              ))}
+                              <td className="text-center font-medium">{data.totalKpi}</td>
+                              <td className="text-center text-neutral-500">{formatMenit(data.totalEstimasi)}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
           </div>
         )}
       </section>

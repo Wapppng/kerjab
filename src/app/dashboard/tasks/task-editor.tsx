@@ -1,11 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ExternalLink, X } from "lucide-react"
+import { ArrowLeft, ChevronDown, ExternalLink, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { KATEGORI_LIST, getJakartaDate, getKpiList, formatMenit, formatTaskDateLabel, type KpiItem } from "@/lib/utils"
+import { KATEGORI_LIST, cn, getJakartaDate, getKpiList, formatMenit, formatTaskDateLabel, type KpiItem } from "@/lib/utils"
 import type { TaskProfile, TaskRole } from "./task-types"
 
 export type TaskEditorData = {
@@ -88,6 +88,35 @@ export function TaskEditor({
     initialTask ? getKpiList(initialRole ?? "designer") : []
   )
 
+  const [judulSuggestions, setJudulSuggestions] = useState<Record<string, string[]>>({})
+  const [showJudulSuggestions, setShowJudulSuggestions] = useState(false)
+  const judulRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    let active = true
+    async function fetchJudulSuggestions() {
+      const { data } = await supabase
+        .from("tasks")
+        .select("judul, kategori")
+        .order("created_at", { ascending: false })
+        .limit(500)
+      if (!active || !data) return
+      const map: Record<string, string[]> = {}
+      for (const row of data) {
+        const cat = row.kategori || ""
+        if (!map[cat]) map[cat] = []
+        if (!map[cat].includes(row.judul)) map[cat].push(row.judul)
+      }
+      setJudulSuggestions(map)
+    }
+    fetchJudulSuggestions()
+    return () => { active = false }
+  }, [supabase])
+
+  const filteredJudulSuggestions = kategori && judulSuggestions[kategori]
+    ? judulSuggestions[kategori].filter((s) => !judul || s.toLowerCase().includes(judul.toLowerCase()))
+    : []
+
   useEffect(() => {
     if (initialTask?.realisasi_waktu_menit != null) {
       if (realisasi !== String(initialTask.realisasi_waktu_menit)) {
@@ -100,10 +129,11 @@ export function TaskEditor({
 
     const kpiInfo = kpiList.find((item) => item.level === Number(kpiLevel))
     const estimatedValue = kpiInfo?.estimasi || task?.estimasi_waktu_menit
+    const outputCount = Number(kuantitasOutput) || 1
     if (estimatedValue) {
-      setRealisasi(String(estimatedValue))
+      setRealisasi(String(estimatedValue * outputCount))
     }
-  }, [kpiLevel, kpiList, task, initialTask?.realisasi_waktu_menit])
+  }, [kpiLevel, kpiList, kuantitasOutput, task, initialTask?.realisasi_waktu_menit])
 
   useEffect(() => {
     let active = true
@@ -258,7 +288,13 @@ export function TaskEditor({
     )
     setWaktuTerselesaikan(completionTime ? completionTime.slice(0, 16) : "")
     setSaving(false)
-    router.refresh()
+
+    if (panelMode && onClose) {
+      onClose()
+      setTimeout(() => window.location.reload(), 100)
+    } else {
+      window.location.reload()
+    }
   }
 
   if (loading) {
@@ -272,7 +308,7 @@ export function TaskEditor({
   const panelMode = mode === "panel"
 
   return (
-    <div className={panelMode ? "flex h-full flex-col" : "max-w-2xl space-y-8"}>
+    <div className={panelMode ? "flex h-full min-h-0 flex-col" : "max-w-2xl space-y-8"}>
       {!panelMode && (
         <Link href="/dashboard/tasks" className="notion-btn w-fit text-sm text-neutral-400 hover:text-neutral-700">
           <ArrowLeft className="h-4 w-4" /> Kembali
@@ -328,10 +364,31 @@ export function TaskEditor({
         </p>
       </div>
 
-      <div className={panelMode ? "flex-1 space-y-6 overflow-y-auto bg-white px-6 py-5" : "space-y-6"}>
-        <div>
+      <div className={panelMode ? "min-h-0 flex-1 space-y-6 overflow-y-auto bg-white px-6 py-5" : "space-y-6"}>
+        <div className="relative">
           <label className="text-sm font-medium text-neutral-700">Judul</label>
-          <input className="notion-input mt-1" value={judul} onChange={(e) => setJudul(e.target.value)} />
+          <input
+            ref={judulRef}
+            className="notion-input mt-1"
+            value={judul}
+            onChange={(e) => setJudul(e.target.value)}
+            onFocus={() => setShowJudulSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowJudulSuggestions(false), 200)}
+          />
+          {showJudulSuggestions && filteredJudulSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 z-10 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[#e5e5e5] bg-white shadow-lg">
+              {filteredJudulSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-[#f7f7f5]"
+                  onMouseDown={(e) => { e.preventDefault(); setJudul(suggestion); setShowJudulSuggestions(false) }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -373,15 +430,6 @@ export function TaskEditor({
           </div>
         </div>
 
-        <div>
-          <label className="text-sm font-medium text-neutral-700">Deskripsi</label>
-          <textarea
-            className="notion-input mt-1 min-h-[100px] resize-y"
-            value={deskripsi}
-            onChange={(e) => setDeskripsi(e.target.value)}
-          />
-        </div>
-
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="text-sm font-medium text-neutral-700">Kategori</label>
@@ -403,10 +451,22 @@ export function TaskEditor({
 
         {kpiInfo && (
           <div className="rounded-md border border-[#e5e5e5] px-4 py-3 text-sm text-neutral-600">
-            Estimasi: <strong>{formatMenit(kpiInfo.estimasi)}</strong>
+            Estimasi: <strong>{formatMenit(kpiInfo.estimasi * (Number(kuantitasOutput) || 1))}</strong>
             {realisasi && <> &middot; Realisasi: <strong>{formatMenit(Number(realisasi))}</strong></>}
           </div>
         )}
+
+        <div>
+          <label className="text-sm font-medium text-neutral-700">Kuantitas Output</label>
+          <input
+            type="number"
+            min="1"
+            className="notion-input mt-1"
+            placeholder="1"
+            value={kuantitasOutput}
+            onChange={(e) => setKuantitasOutput(e.target.value)}
+          />
+        </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
@@ -455,18 +515,13 @@ export function TaskEditor({
           </div>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label className="text-sm font-medium text-neutral-700">Kuantitas Output</label>
-            <input
-              type="number"
-              min="1"
-              className="notion-input mt-1"
-              placeholder="1"
-              value={kuantitasOutput}
-              onChange={(e) => setKuantitasOutput(e.target.value)}
-            />
-          </div>
+        <div>
+          <label className="text-sm font-medium text-neutral-700">Deskripsi <span className="text-neutral-400 font-normal">(opsional)</span></label>
+          <textarea
+            className="notion-input mt-1 min-h-[100px] resize-y"
+            value={deskripsi}
+            onChange={(e) => setDeskripsi(e.target.value)}
+          />
         </div>
 
         {error && (
@@ -476,9 +531,12 @@ export function TaskEditor({
         )}
       </div>
 
-      <div className={panelMode ? "border-t border-[#e9e9e7] bg-white px-6 py-4" : "pt-2"}>
+      <div className={cn("flex gap-2", panelMode ? "border-t border-[#e9e9e7] bg-white px-6 py-4" : "pt-2")}>
         <button className="notion-btn notion-btn-primary" onClick={handleSave} disabled={saving}>
           {saving ? "Menyimpan..." : "Simpan Perubahan"}
+        </button>
+        <button type="button" className="notion-btn" onClick={onClose ?? (() => window.history.back())}>
+          Batal
         </button>
       </div>
     </div>

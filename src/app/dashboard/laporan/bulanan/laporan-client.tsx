@@ -7,7 +7,7 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { FileDown, FileSpreadsheet } from "lucide-react"
 import { formatMenit } from "@/lib/utils"
-import type { ReportCategorySummary, ReportUserSummary } from "./laporan-types"
+import type { ReportCategorySummary, ReportJudulSummary, ReportUserSummary } from "./laporan-types"
 
 const CATEGORY_COLORS = ["#2383e2", "#8b5cf6", "#f97316", "#22c55e", "#6b7280"]
 
@@ -18,12 +18,28 @@ type AutoTableDocument = jsPDF & {
 export function LaporanClient({
   taskByUser,
   taskByCategory,
+  taskByJudul,
+  kpiLevels,
+  outputByKpiLevel,
+  kpiScoreByKpiLevel,
+  totalEstimasiMenit,
+  totalRealisasiMenit,
+  avgEstimasiJamPerHari,
+  workingDays,
   month,
   year,
   overallRasioRealisasi = 0,
 }: {
   taskByUser: Record<string, ReportUserSummary>
   taskByCategory: Record<string, ReportCategorySummary>
+  taskByJudul: Record<string, ReportJudulSummary>
+  kpiLevels: number[]
+  outputByKpiLevel: Record<number, number>
+  kpiScoreByKpiLevel: Record<number, number>
+  totalEstimasiMenit: number
+  totalRealisasiMenit: number
+  avgEstimasiJamPerHari: number
+  workingDays: number
   month: number
   year: number
   overallRasioRealisasi?: number
@@ -40,6 +56,18 @@ export function LaporanClient({
       name: category.replaceAll("_", " "),
       value: data.totalOutput,
     })), [taskByCategory])
+
+  const outputLevelChartData = useMemo(() =>
+    kpiLevels.map((level) => ({
+      level: `L${level}`,
+      value: outputByKpiLevel[level] || 0,
+    })), [kpiLevels, outputByKpiLevel])
+
+  const kpiLevelChartData = useMemo(() =>
+    kpiLevels.map((level) => ({
+      level: `L${level}`,
+      value: kpiScoreByKpiLevel[level] || 0,
+    })), [kpiLevels, kpiScoreByKpiLevel])
 
   function exportExcel() {
     const workbook = XLSX.utils.book_new()
@@ -65,6 +93,25 @@ export function LaporanClient({
       }))
     )
     XLSX.utils.book_append_sheet(workbook, categorySheet, "Per Kategori")
+
+    const judulSheet = XLSX.utils.json_to_sheet(
+      Object.values(taskByJudul)
+        .sort((left, right) => right.totalOutput - left.totalOutput)
+        .map((data) => {
+          const row: Record<string, string | number> = {
+            Judul: data.judul,
+            "Total Output": data.totalOutput,
+          }
+          for (const level of kpiLevels) {
+            row[`L${level}`] = data.outputByKpiLevel[level] || 0
+          }
+          row["Total KPI"] = data.totalKpi
+          row["Estimasi (menit)"] = data.totalEstimasi
+          return row
+        })
+    )
+    XLSX.utils.book_append_sheet(workbook, judulSheet, "Per Judul")
+
     XLSX.writeFile(workbook, `Laporan_${month}_${year}.xlsx`)
   }
 
@@ -106,28 +153,63 @@ export function LaporanClient({
       headStyles: { fillColor: [55, 53, 47] },
     })
 
+    const judulY = ((document as AutoTableDocument).lastAutoTable?.finalY || finalY + 5) + 15
+    document.text("Rekap per Judul", 14, judulY)
+    autoTable(document, {
+      startY: judulY + 5,
+      head: [["Judul", "Total Output", ...kpiLevels.map((l) => `L${l}`), "Total KPI", "Estimasi"]],
+      body: Object.values(taskByJudul)
+        .sort((left, right) => right.totalOutput - left.totalOutput)
+        .map((data) => [
+          data.judul,
+          data.totalOutput,
+          ...kpiLevels.map((level) => data.outputByKpiLevel[level] || "-"),
+          data.totalKpi,
+          formatMenit(data.totalEstimasi),
+        ]),
+      styles: { font: "helvetica", fontSize: 9 },
+      headStyles: { fillColor: [55, 53, 47] },
+    })
+
     document.save(`Laporan_${month}_${year}.pdf`)
   }
 
       return (
         <div className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { label: "Rasio Realisasi", value: overallRasioRealisasi, description: "Rata-rata rasio realisasi terhadap estimasi" },
-              { label: "KPI Earned", value: Object.values(taskByUser).reduce((total, data) => total + data.totalKpi, 0), description: "KPI hanya dari task selesai" },
-              { label: "Jumlah Task selesai", value: Object.values(taskByUser).reduce((total, data) => total + data.totalCompleted, 0), description: "Jumlah tugas yang selesai" },
-              { label: "Jumlah Task dibuat", value: Object.values(taskByUser).reduce((total, data) => total + data.totalCreated, 0), description: "Jumlah tugas yang dibuat" },
-              { label: "Jumlah Output", value: Object.values(taskByUser).reduce((total, data) => total + data.totalOutput, 0), description: "Jumlah output yang dihasilkan" },
-            ].map(({ label, value, description }) => (
+              { label: "Rasio Realisasi", value: overallRasioRealisasi, description: "Rata-rata rasio realisasi terhadap estimasi", format: "pct" },
+              { label: "KPI Earned", value: Object.values(taskByUser).reduce((total, data) => total + data.totalKpi, 0), description: "KPI hanya dari task selesai", format: "num" },
+              { label: "Jumlah Output", value: Object.values(taskByUser).reduce((total, data) => total + data.totalOutput, 0), description: "Jumlah output yang dihasilkan", format: "num" },
+              { label: "Jumlah Task selesai", value: Object.values(taskByUser).reduce((total, data) => total + data.totalCompleted, 0), description: "Jumlah tugas yang selesai", format: "num" },
+            ].map(({ label, value, description, format }) => (
               <div key={label} className="rounded-lg border border-[#e5e5e5] p-4">
                 <div className="text-sm text-neutral-500">{label}</div>
                 <p className="mt-1 text-2xl font-semibold tracking-tight">
-                  {label === "Rasio Realisasi" ? (typeof value === 'number' ? (value * 100).toFixed(2) + '%' : '-') : 
+                  {format === "pct" ? (typeof value === 'number' ? (value * 100).toFixed(2) + '%' : '-') : 
                    typeof value === 'number' ? value : '-'}
                 </p>
                 <p className="mt-1 text-xs text-neutral-400">{description}</p>
               </div>
             ))}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-[#e5e5e5] p-4">
+              <div className="text-sm text-neutral-500">Total Estimasi</div>
+              <p className="mt-1 text-2xl font-semibold tracking-tight">{formatMenit(totalEstimasiMenit)}</p>
+              <p className="mt-1 text-xs text-neutral-400">Total estimasi waktu seluruh task selesai</p>
+            </div>
+            <div className="rounded-lg border border-[#e5e5e5] p-4">
+              <div className="text-sm text-neutral-500">Total Realisasi</div>
+              <p className="mt-1 text-2xl font-semibold tracking-tight">{formatMenit(totalRealisasiMenit)}</p>
+              <p className="mt-1 text-xs text-neutral-400">Total realisasi waktu seluruh task selesai</p>
+            </div>
+            <div className="rounded-lg border border-[#e5e5e5] p-4">
+              <div className="text-sm text-neutral-500">Rata-rata Estimasi per Hari</div>
+              <p className="mt-1 text-2xl font-semibold tracking-tight">{avgEstimasiJamPerHari.toFixed(1)} jam</p>
+              <p className="mt-1 text-xs text-neutral-400">Rata-rata estimasi per hari kerja ({workingDays} hari)</p>
+            </div>
           </div>
 
           {(userChartData.length > 0 || categoryChartData.length > 0) && (
@@ -165,6 +247,60 @@ export function LaporanClient({
                       >
                         {categoryChartData.map((item, index) => (
                           <Cell key={item.name} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          )}
+
+          {(outputLevelChartData.length > 0 || kpiLevelChartData.length > 0) && (
+            <div className="grid gap-6 lg:grid-cols-2">
+              {outputLevelChartData.length > 0 && (
+                <div className="min-w-0 rounded-lg border border-[#e5e5e5] p-4 sm:p-5">
+                  <h3 className="mb-4 text-sm font-medium text-neutral-500">Kuantitas Output per Level KPI</h3>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <PieChart>
+                      <Pie
+                        data={outputLevelChartData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={82}
+                        dataKey="value"
+                        label={({ level, percent }: { level?: string; percent?: number }) =>
+                          `${level || ""} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                        }
+                      >
+                        {outputLevelChartData.map((item, index) => (
+                          <Cell key={item.level} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {kpiLevelChartData.length > 0 && (
+                <div className="min-w-0 rounded-lg border border-[#e5e5e5] p-4 sm:p-5">
+                  <h3 className="mb-4 text-sm font-medium text-neutral-500">Skor KPI per Level KPI</h3>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <PieChart>
+                      <Pie
+                        data={kpiLevelChartData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={82}
+                        dataKey="value"
+                        label={({ level, percent }: { level?: string; percent?: number }) =>
+                          `${level || ""} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                        }
+                      >
+                        {kpiLevelChartData.map((item, index) => (
+                          <Cell key={item.level} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip />

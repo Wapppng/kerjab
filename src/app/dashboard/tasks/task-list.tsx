@@ -22,6 +22,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { TaskCreateEditor } from "./task-create-editor"
 import { TaskEditor, type TaskEditorData } from "./task-editor"
 import type { TaskProfile, TaskRole } from "./task-types"
@@ -118,6 +119,7 @@ export function TaskList({
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [updatingTitleId, setUpdatingTitleId] = useState<string | null>(null)
   const [error, setError] = useState("")
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [activePeek, setActivePeek] = useState<PeekState>(initialPeek)
   const [renderedPeek, setRenderedPeek] = useState<PeekState>(initialPeek)
   const selectedTaskId = activePeek?.type === "edit" ? activePeek.taskId : null
@@ -242,9 +244,14 @@ export function TaskList({
     Boolean(dateTo)
 
   async function handleDelete(id: string) {
-    if (!confirm("Hapus task ini?")) return
+    setDeleteTarget(id)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleteTarget(null)
     setError("")
-    const { error: deleteError } = await supabase.from("tasks").delete().eq("id", id)
+    const { error: deleteError } = await supabase.from("tasks").delete().eq("id", deleteTarget)
     if (deleteError) {
       setError(`Task belum terhapus: ${deleteError.message}`)
       return
@@ -508,7 +515,7 @@ export function TaskList({
               onClose={() => setPeek(null)}
               onCreated={() => {
                 setPeek(null)
-                router.refresh()
+                setTimeout(() => window.location.reload(), 100)
               }}
             />
           ) : renderedTaskId ? (
@@ -527,6 +534,17 @@ export function TaskList({
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Hapus task?"
+        message="Data yang sudah dihapus tidak bisa dikembalikan."
+        confirmLabel="Hapus"
+        cancelLabel="Batal"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </>
   )
 }
@@ -627,7 +645,7 @@ function FragmentGroup({
             <td className="hidden text-xs text-neutral-500 lg:table-cell">
               {task.kpi_bobot ?? task.kpi_level} <span className="text-neutral-300">(L{task.kpi_level})</span>
             </td>
-            <td className="hidden text-xs text-neutral-500 lg:table-cell">{formatMenit(task.estimasi_waktu_menit)}</td>
+            <td className="hidden text-xs text-neutral-500 lg:table-cell">{formatMenit(task.estimasi_waktu_menit * (task.kuantitas_output || 1))}</td>
             <td>
               <select
                 className="notion-select text-xs"

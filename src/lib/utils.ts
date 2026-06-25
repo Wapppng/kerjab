@@ -23,11 +23,11 @@ export const STATUS_LIST = [
 export type KpiItem = { level: number; label: string; bobot: number; estimasi: number }
 
 export const KPI_LIST: readonly KpiItem[] = [
-  { level: 1, label: "Sangat Mudah", bobot: 1, estimasi: 30 },
-  { level: 2, label: "Mudah", bobot: 2, estimasi: 60 },
-  { level: 3, label: "Sedang", bobot: 3, estimasi: 120 },
-  { level: 4, label: "Sulit", bobot: 4, estimasi: 240 },
-  { level: 5, label: "Sangat Sulit", bobot: 5, estimasi: 480 },
+  { level: 1, label: "Sangat Mudah", bobot: 1, estimasi: 1 },
+  { level: 2, label: "Mudah", bobot: 2, estimasi: 5 },
+  { level: 3, label: "Sedang", bobot: 6, estimasi: 30 },
+  { level: 4, label: "Sulit", bobot: 12, estimasi: 60 },
+  { level: 5, label: "Sangat Sulit", bobot: 30, estimasi: 150 },
 ] as const
 
 export const KPI_LIST_VIDEO: readonly KpiItem[] = [
