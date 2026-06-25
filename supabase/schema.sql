@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   realisasi_waktu_menit INT,
   link_hasil TEXT,
   status TEXT NOT NULL CHECK (status IN ('pending', 'progress', 'review', 'selesai')) DEFAULT 'pending',
+  task_date DATE NOT NULL DEFAULT ((NOW() AT TIME ZONE 'Asia/Jakarta')::date),
+  created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
   waktu_terselesaikan TIMESTAMPTZ,
   kuantitas_output INT NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -53,6 +55,8 @@ CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_kategori ON tasks(kategori);
+CREATE INDEX IF NOT EXISTS idx_tasks_task_date ON tasks(task_date DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by);
 CREATE INDEX IF NOT EXISTS idx_tasks_completion_time ON tasks(waktu_terselesaikan) WHERE status = 'selesai';
 
 -- Apply role-specific KPI values whenever a task is created or its KPI changes
@@ -110,6 +114,28 @@ CREATE OR REPLACE TRIGGER sync_task_completion_state
   FOR EACH ROW
   EXECUTE FUNCTION sync_task_completion();
 
+-- Creator is derived from the authenticated user and cannot be reassigned
+CREATE OR REPLACE FUNCTION enforce_task_creator()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    NEW.created_by := COALESCE(auth.uid(), NEW.created_by, NEW.user_id);
+  ELSE
+    NEW.created_by := OLD.created_by;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER enforce_task_creator_identity
+  BEFORE INSERT OR UPDATE OF created_by ON tasks
+  FOR EACH ROW
+  EXECUTE FUNCTION enforce_task_creator();
+
 -- Function: auto-create profile on signup
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER
@@ -140,12 +166,39 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
--- Profiles: users can read their own, admins can read all
-CREATE POLICY profiles_select ON profiles
-  FOR SELECT USING (
-    id = auth.uid()
-    OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.profiles
+    WHERE id = auth.uid() AND role = 'admin'
   );
+$$;
+
+CREATE OR REPLACE FUNCTION can_view_profile(profile_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    profile_id = auth.uid()
+    OR is_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM public.tasks
+      WHERE (user_id = auth.uid() OR created_by = auth.uid())
+        AND (user_id = profile_id OR created_by = profile_id)
+    );
+$$;
+
+-- Profiles: users can read themselves, admins can read all, task participants can read each other
+CREATE POLICY profiles_select ON profiles
+  FOR SELECT USING (can_view_profile(id));
 
 CREATE POLICY profiles_update ON profiles
   FOR UPDATE
@@ -162,23 +215,33 @@ CREATE POLICY profiles_update ON profiles
 CREATE POLICY tasks_select ON tasks
   FOR SELECT USING (
     user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    OR created_by = auth.uid()
+    OR is_admin()
   );
 
 CREATE POLICY tasks_insert ON tasks
   FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    created_by = auth.uid()
+    AND (
+      user_id = auth.uid()
+      OR is_admin()
+    )
   );
 
 CREATE POLICY tasks_update ON tasks
   FOR UPDATE USING (
     user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    OR created_by = auth.uid()
+    OR is_admin()
+  ) WITH CHECK (
+    user_id = auth.uid()
+    OR created_by = auth.uid()
+    OR is_admin()
   );
 
 CREATE POLICY tasks_delete ON tasks
   FOR DELETE USING (
     user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    OR created_by = auth.uid()
+    OR is_admin()
   );

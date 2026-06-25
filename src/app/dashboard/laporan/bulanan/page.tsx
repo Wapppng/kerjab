@@ -25,7 +25,7 @@ type ReportTask = {
   estimasi_waktu_menit: number
   realisasi_waktu_menit: number | null
   kuantitas_output: number | null
-  profiles: { name: string }[] | null
+  assignee: { name: string }[] | null
 }
 
 function firstValue(value: string | string[] | undefined) {
@@ -47,7 +47,7 @@ function periodBoundaries(year: number, month: number) {
 function getUserSummary(summaries: Record<string, ReportUserSummary>, task: ReportTask) {
   if (!summaries[task.user_id]) {
     summaries[task.user_id] = {
-      name: task.profiles?.[0]?.name || "Tanpa Nama",
+      name: task.assignee?.[0]?.name || "Tanpa Nama",
       totalCreated: 0,
       totalCompleted: 0,
       totalOutput: 0,
@@ -87,13 +87,13 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
 
   let createdQuery = supabase
     .from("tasks")
-    .select("user_id, kategori, kpi_level, kpi_bobot, estimasi_waktu_menit, realisasi_waktu_menit, kuantitas_output, profiles(name)")
+    .select("user_id, kategori, kpi_level, kpi_bobot, estimasi_waktu_menit, realisasi_waktu_menit, kuantitas_output, assignee:profiles!tasks_user_id_fkey(name)")
     .gte("created_at", period.start)
     .lt("created_at", period.end)
 
   let completedQuery = supabase
     .from("tasks")
-    .select("user_id, kategori, kpi_level, kpi_bobot, estimasi_waktu_menit, realisasi_waktu_menit, kuantitas_output, profiles(name)")
+    .select("user_id, kategori, kpi_level, kpi_bobot, estimasi_waktu_menit, realisasi_waktu_menit, kuantitas_output, assignee:profiles!tasks_user_id_fkey(name)")
     .eq("status", "selesai")
     .gte("waktu_terselesaikan", period.start)
     .lt("waktu_terselesaikan", period.end)
@@ -114,8 +114,8 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
     supabase.from("profiles").select("id, name").order("name"),
   ])
 
-  const createdTasks = (createdResult.data || []) as ReportTask[]
-  const completedTasks = (completedResult.data || []) as ReportTask[]
+  const createdTasks = (createdResult.data || []) as unknown as ReportTask[]
+  const completedTasks = (completedResult.data || []) as unknown as ReportTask[]
   const allProfiles = (profilesResult.data || []) as ProfileOption[]
   const taskByUser: Record<string, ReportUserSummary> = {}
   const taskByCategory: Record<string, ReportCategorySummary> = {}

@@ -9,15 +9,29 @@ AS $$
   SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin');
 $$;
 
+CREATE OR REPLACE FUNCTION can_view_profile(profile_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    profile_id = auth.uid()
+    OR is_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM public.tasks
+      WHERE (user_id = auth.uid() OR created_by = auth.uid())
+        AND (user_id = profile_id OR created_by = profile_id)
+    );
+$$;
+
 -- Drop & recreate profiles policies
 DROP POLICY IF EXISTS profiles_select ON profiles;
 DROP POLICY IF EXISTS profiles_update ON profiles;
 
 CREATE POLICY profiles_select ON profiles
-  FOR SELECT USING (
-    id = auth.uid()
-    OR is_admin()
-  );
+  FOR SELECT USING (can_view_profile(id));
 
 CREATE POLICY profiles_update ON profiles
   FOR UPDATE
@@ -39,24 +53,33 @@ DROP POLICY IF EXISTS tasks_delete ON tasks;
 CREATE POLICY tasks_select ON tasks
   FOR SELECT USING (
     user_id = auth.uid()
+    OR created_by = auth.uid()
     OR is_admin()
   );
 
 CREATE POLICY tasks_insert ON tasks
   FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR is_admin()
+    created_by = auth.uid()
+    AND (user_id = auth.uid() OR is_admin())
   );
 
 CREATE POLICY tasks_update ON tasks
-  FOR UPDATE USING (
+  FOR UPDATE
+  USING (
     user_id = auth.uid()
+    OR created_by = auth.uid()
+    OR is_admin()
+  )
+  WITH CHECK (
+    user_id = auth.uid()
+    OR created_by = auth.uid()
     OR is_admin()
   );
 
 CREATE POLICY tasks_delete ON tasks
   FOR DELETE USING (
     user_id = auth.uid()
+    OR created_by = auth.uid()
     OR is_admin()
   );
 
