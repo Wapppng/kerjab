@@ -1,13 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, BarChart3, Calendar, CheckCircle2, ChevronDown, Clock, ExternalLink, FileText, Layers, Link as LinkIcon, Tag, User, UserPlus, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { KATEGORI_LIST, cn, getJakartaDate, getKpiList, formatMenit, formatTaskDateLabel, toTaskRole, type KpiItem } from "@/lib/utils"
+import { STATUS_CONFIG } from "./task-types"
 import type { TaskProfile, TaskRole } from "./task-types"
 import NotionEditor from "@/components/tiptap/notion-editor"
+import { NotionSelect } from "@/components/ui/notion-select"
 
 export type TaskEditorData = {
   id: string
@@ -28,13 +30,6 @@ export type TaskEditorData = {
   created_by?: string
   created_at?: string
 }
-
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", dot: "bg-yellow-400" },
-  { value: "progress", label: "Progress", dot: "bg-blue-400" },
-  { value: "review", label: "Review", dot: "bg-purple-400" },
-  { value: "selesai", label: "Selesai", dot: "bg-green-400" },
-] as const
 
 export function TaskEditor({
   taskId,
@@ -292,9 +287,9 @@ export function TaskEditor({
 
     if (panelMode && onClose) {
       onClose()
-      setTimeout(() => window.location.reload(), 100)
+      router.refresh()
     } else {
-      window.location.reload()
+      router.push("/dashboard/tasks")
     }
   }
 
@@ -320,7 +315,7 @@ export function TaskEditor({
         <div className={panelMode ? "flex items-start justify-between gap-4" : "space-y-2"}>
           <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <span className={`notion-dot ${STATUS_OPTIONS.find((item) => item.value === status)?.dot || "bg-neutral-300"}`} />
+              <span className={`notion-dot ${STATUS_CONFIG.find((item) => item.value === status)?.dot || "bg-neutral-300"}`} />
               <h1 className="truncate text-2xl font-semibold tracking-tight">{panelMode ? task.judul : "Edit Task"}</h1>
             </div>
             {panelMode && (
@@ -369,19 +364,11 @@ export function TaskEditor({
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Tag className="h-3.5 w-3.5 text-neutral-500" />Kategori</label>
-            <select className="notion-select mt-1 w-full" value={kategori} onChange={(e) => setKategori(e.target.value)}>
-              {KATEGORI_LIST.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+            <NotionSelect className="mt-1 w-full" value={kategori} onChange={setKategori} options={KATEGORI_LIST.map((item) => ({ value: item.value, label: item.label }))} />
           </div>
           <div>
             <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><BarChart3 className="h-3.5 w-3.5 text-neutral-500" />KPI Level</label>
-            <select className="notion-select mt-1 w-full" value={kpiLevel} onChange={(e) => setKpiLevel(e.target.value)}>
-              {kpiList.map((item) => (
-                <option key={item.level} value={item.level}>{item.label} (bobot {item.bobot})</option>
-              ))}
-            </select>
+            <NotionSelect className="mt-1 w-full" value={kpiLevel} onChange={setKpiLevel} options={kpiList.map((item) => ({ value: String(item.level), label: `${item.label} (bobot ${item.bobot})` }))} />
           </div>
         </div>
 
@@ -396,6 +383,7 @@ export function TaskEditor({
             <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-neutral-500" />Judul</label>
           <input
             ref={judulRef}
+            autoFocus={!panelMode}
             className="notion-input mt-1"
             value={judul}
             onChange={(e) => setJudul(e.target.value)}
@@ -430,15 +418,7 @@ export function TaskEditor({
           </div>
           <div>
             <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-neutral-500" />Assignee</label>
-            <select
-              className="notion-select mt-1 w-full"
-              value={assigneeId}
-              onChange={(event) => handleAssigneeChange(event.target.value)}
-            >
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>{profile.name}</option>
-              ))}
-            </select>
+            <NotionSelect className="mt-1 w-full" value={assigneeId} onChange={handleAssigneeChange} options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))} />
           </div>
         </div>
 
@@ -449,13 +429,6 @@ export function TaskEditor({
             <span>{taskCreator?.name || "Pengguna"}</span>
           </div>
         </div>
-
-        {kpiInfo && (
-          <div className="rounded-md border border-[#e5e5e5] px-4 py-3 text-sm text-neutral-600">
-            Estimasi: <strong>{formatMenit(kpiInfo.estimasi * (Number(kuantitasOutput) || 1))}</strong>
-            {realisasi && <> &middot; Realisasi: <strong>{formatMenit(Number(realisasi))}</strong></>}
-          </div>
-        )}
 
         <div>
           <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Layers className="h-3.5 w-3.5 text-neutral-500" />Kuantitas Output</label>
@@ -472,11 +445,7 @@ export function TaskEditor({
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-neutral-500" />Status</label>
-            <select className="notion-select mt-1 w-full" value={status} onChange={(e) => setStatus(e.target.value)}>
-              {STATUS_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+            <NotionSelect className="mt-1 w-full" value={status} onChange={setStatus} options={STATUS_CONFIG.map((item) => ({ value: item.value, label: item.label, prefix: <span className={`notion-dot ${item.dot}`} />, optionClassName: `${item.bg} ${item.text} rounded-full border-0 font-medium` }))} />
           </div>
           <div>
             <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-neutral-500" />Realisasi (menit)</label>

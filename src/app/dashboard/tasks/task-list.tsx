@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
@@ -24,8 +24,10 @@ import {
 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { NotionSelect } from "@/components/ui/notion-select"
 import { TaskCreateEditor } from "./task-create-editor"
 import { TaskEditor, type TaskEditorData } from "./task-editor"
+import { STATUS_CONFIG } from "./task-types"
 import type { TaskProfile, TaskRole } from "./task-types"
 
 type Task = TaskEditorData & {
@@ -37,12 +39,13 @@ type Task = TaskEditorData & {
 type PeekState = { type: "create"; date?: string } | { type: "edit"; taskId: string } | null
 type DatePreset = "all" | "today" | "week" | "month" | "custom"
 
-const STATUS_META: Record<string, { label: string; dot: string }> = {
-  pending: { label: "Pending", dot: "bg-yellow-400" },
-  progress: { label: "Progress", dot: "bg-blue-400" },
-  review: { label: "Review", dot: "bg-purple-400" },
-  selesai: { label: "Selesai", dot: "bg-green-400" },
-}
+const STATUS_OPTIONS_PILL: { value: string; label: string; prefix: ReactNode; optionClassName: string }[] =
+  STATUS_CONFIG.map((s) => ({
+    value: s.value,
+    label: s.label,
+    prefix: <span className={`notion-dot ${s.dot}`} />,
+    optionClassName: `${s.bg} ${s.text} rounded-full border-0 font-medium`,
+  }))
 
 const DATE_PRESETS: Array<{ value: DatePreset; label: string }> = [
   { value: "all", label: "Semua" },
@@ -374,38 +377,22 @@ export function TaskList({
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
-            <select
-              className="notion-select w-full lg:w-auto"
-              value={filterStatus}
-              onChange={(event) => handleStatusFilterChange(event.target.value)}
-            >
-              <option value="all">Semua Status</option>
-              <option value="pending">Pending</option>
-              <option value="progress">Progress</option>
-              <option value="review">Review</option>
-              <option value="selesai">Selesai</option>
-            </select>
-            <select
-              className="notion-select w-full lg:w-auto"
-              value={filterKategori}
-              onChange={(event) => handleKategoriFilterChange(event.target.value)}
-            >
-              <option value="all">Semua Kategori</option>
-              {KATEGORI_LIST.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-            <select
-              className="notion-select w-full lg:w-auto"
-              value={filterAssignee}
-              onChange={(event) => handleAssigneeFilterChange(event.target.value)}
-            >
-              <option value="all">Semua</option>
-              <option value={userId}>Saya</option>
-              {isAdmin && profiles.filter((p) => p.id !== userId).map((profile) => (
-                <option key={profile.id} value={profile.id}>{profile.name}</option>
-              ))}
-            </select>
+            <NotionSelect className="w-full lg:w-auto" value={filterStatus} onChange={handleStatusFilterChange} options={[
+              { value: "all", label: "Semua Status" },
+              { value: "pending", label: "Pending" },
+              { value: "progress", label: "Progress" },
+              { value: "review", label: "Review" },
+              { value: "selesai", label: "Selesai" },
+            ]} />
+            <NotionSelect className="w-full lg:w-auto" value={filterKategori} onChange={handleKategoriFilterChange} options={[
+              { value: "all", label: "Semua Kategori" },
+              ...KATEGORI_LIST.map((item) => ({ value: item.value, label: item.label })),
+            ]} />
+            <NotionSelect className="w-full lg:w-auto" value={filterAssignee} onChange={handleAssigneeFilterChange} options={[
+              { value: "all", label: "Semua" },
+              { value: userId, label: "Saya" },
+              ...(isAdmin ? profiles.filter((p) => p.id !== userId).map((p) => ({ value: p.id, label: p.name })) : []),
+            ]} />
           </div>
 
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -461,7 +448,6 @@ export function TaskList({
             <table className={`notion-table ${filtered.length === 0 ? "min-w-full" : "min-w-[620px] lg:min-w-[920px]"}`}>
               <thead>
                 <tr>
-                  <th className="w-3"></th>
                   <th>Nama</th>
                   <th className="hidden md:table-cell">Kategori</th>
                   <th className="hidden lg:table-cell">KPI</th>
@@ -475,12 +461,12 @@ export function TaskList({
                 {filtered.length === 0 && (
                   <>
                     <tr>
-                      <td colSpan={8} className="py-10 text-center text-sm text-neutral-400">
+                      <td colSpan={7} className="py-10 text-center text-sm text-neutral-400">
                         Belum ada task yang sesuai
                       </td>
                     </tr>
                     <tr className="task-new-row">
-                      <td colSpan={8}>
+                      <td colSpan={7}>
                         <button
                           type="button"
                           className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-neutral-400 transition-colors hover:bg-[#f7f7f5] hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2383e2]"
@@ -616,7 +602,7 @@ function FragmentGroup({
   return (
     <>
       <tr className="task-group-row">
-        <td colSpan={8}>
+        <td colSpan={7}>
           <button type="button" className="flex w-full items-center gap-2 text-left" onClick={onToggleDate}>
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             <span className="font-medium text-neutral-700">{formatTaskDateLabel(date)}</span>
@@ -627,7 +613,6 @@ function FragmentGroup({
       </tr>
 
       {!collapsed && group.map((task) => {
-        const statusMeta = STATUS_META[task.status] || STATUS_META.pending
         const isSelected = selectedTaskId === task.id
         return (
           <tr
@@ -643,9 +628,6 @@ function FragmentGroup({
             className={isSelected ? "bg-[#f5f9ff]" : "cursor-pointer"}
             aria-selected={isSelected}
           >
-            <td>
-              <span className={`notion-dot ${statusMeta.dot} ml-3`} />
-            </td>
             <td>
               <div className="flex min-w-[260px] items-center gap-2">
                 <input
@@ -681,19 +663,15 @@ function FragmentGroup({
             </td>
             <td className="hidden text-xs text-neutral-500 lg:table-cell">{formatMenit(task.estimasi_waktu_menit * (task.kuantitas_output || 1))}</td>
             <td>
-              <select
-                className="notion-select text-xs"
-                value={task.status}
-                onClick={(event) => event.stopPropagation()}
-                onChange={(event) => onStatusChange(task, event.target.value)}
-                disabled={updatingId === task.id}
-                aria-label={`Ubah status ${task.judul}`}
-              >
-                <option value="pending">Pending</option>
-                <option value="progress">Progress</option>
-                <option value="review">Review</option>
-                <option value="selesai">Selesai</option>
-              </select>
+              <span onClick={(e) => e.stopPropagation()}>
+                <NotionSelect
+                  className="text-xs px-[6px] py-[2px]"
+                  value={task.status}
+                  onChange={(value) => onStatusChange(task, value)}
+                  disabled={updatingId === task.id}
+                  options={STATUS_OPTIONS_PILL}
+                />
+              </span>
             </td>
             <td>
               <PersonBadge profile={task.assignee} />
@@ -743,7 +721,7 @@ function FragmentGroup({
 
       {!collapsed && (
         <tr className="task-new-row">
-          <td colSpan={8}>
+          <td colSpan={7}>
             <button
               type="button"
               className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-neutral-400 transition-colors hover:bg-[#f7f7f5] hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2383e2]"

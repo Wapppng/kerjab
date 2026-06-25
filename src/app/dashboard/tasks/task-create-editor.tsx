@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { KATEGORI_LIST, cn, formatMenit, getJakartaDate, getKpiList, toTaskRole, type KpiItem } from "@/lib/utils"
 import type { TaskProfile, TaskRole } from "./task-types"
 import NotionEditor from "@/components/tiptap/notion-editor"
+import { NotionSelect } from "@/components/ui/notion-select"
 
 export function TaskCreateEditor({
   mode = "page",
@@ -229,32 +230,11 @@ export function TaskCreateEditor({
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><Tag className="h-3.5 w-3.5 text-neutral-500" />Kategori</label>
-            <select
-              className="notion-select mt-1 w-full"
-              value={form.kategori}
-              onChange={(event) => setForm({ ...form, kategori: event.target.value })}
-              required
-            >
-              <option value="" disabled>Pilih kategori</option>
-              {KATEGORI_LIST.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+            <NotionSelect className="mt-1 w-full" value={form.kategori} onChange={(value) => setForm({ ...form, kategori: value })} options={KATEGORI_LIST.map((item) => ({ value: item.value, label: item.label }))} placeholder="Pilih kategori" />
           </div>
           <div>
             <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><BarChart3 className="h-3.5 w-3.5 text-neutral-500" />KPI Level</label>
-            <select
-              className="notion-select mt-1 w-full"
-              value={form.kpi_level}
-              onChange={(event) => setForm({ ...form, kpi_level: event.target.value })}
-              disabled={kpiLoading}
-              required
-            >
-              <option value="" disabled>{kpiLoading ? "Memuat aturan KPI..." : "Pilih tingkat kesulitan"}</option>
-              {kpiList.map((item) => (
-                <option key={item.level} value={item.level}>{item.label} (bobot {item.bobot})</option>
-              ))}
-            </select>
+            <NotionSelect className="mt-1 w-full" value={form.kpi_level} onChange={(value) => setForm({ ...form, kpi_level: value })} options={kpiList.map((item) => ({ value: String(item.level), label: `${item.label} (bobot ${item.bobot})` }))} placeholder={kpiLoading ? "Memuat aturan KPI..." : "Pilih tingkat kesulitan"} disabled={kpiLoading} />
           </div>
         </div>
 
@@ -306,16 +286,7 @@ export function TaskCreateEditor({
           </div>
           <div>
             <label className="text-sm font-medium text-neutral-700 inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-neutral-500" />Assignee</label>
-            <select
-              className="notion-select mt-1 w-full"
-              value={assigneeId}
-              onChange={(event) => setAssigneeId(event.target.value)}
-              required
-            >
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>{profile.name}</option>
-              ))}
-            </select>
+            <NotionSelect className="mt-1 w-full" value={assigneeId} onChange={setAssigneeId} options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))} placeholder="Pilih assignee" />
           </div>
         </div>
 
@@ -351,7 +322,7 @@ export function TaskCreateEditor({
         </div>
 
         <p className="text-xs text-neutral-400">
-          Waktu selesai dicatat otomatis ketika status task diubah menjadi Selesai.
+          Status dan waktu selesai bisa diatur nanti saat mengedit task.
         </p>
 
         <div>
