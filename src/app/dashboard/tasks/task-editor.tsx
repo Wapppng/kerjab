@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, ExternalLink, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -77,6 +77,8 @@ export function TaskEditor({
   const [realisasi, setRealisasi] = useState(
     initialTask?.realisasi_waktu_menit ? String(initialTask.realisasi_waktu_menit) : ""
   )
+  const realisasiTouched = useRef(false)
+
   const [taskDate, setTaskDate] = useState(
     initialTask?.task_date ?? getJakartaDate(initialTask?.created_at ? new Date(initialTask.created_at) : new Date())
   )
@@ -85,6 +87,23 @@ export function TaskEditor({
   const [kpiList, setKpiList] = useState<readonly KpiItem[]>(
     initialTask ? getKpiList(initialRole ?? "designer") : []
   )
+
+  useEffect(() => {
+    if (initialTask?.realisasi_waktu_menit != null) {
+      if (realisasi !== String(initialTask.realisasi_waktu_menit)) {
+        setRealisasi(String(initialTask.realisasi_waktu_menit))
+      }
+      return
+    }
+
+    if (realisasiTouched.current) return
+
+    const kpiInfo = kpiList.find((item) => item.level === Number(kpiLevel))
+    const estimatedValue = kpiInfo?.estimasi || task?.estimasi_waktu_menit
+    if (estimatedValue) {
+      setRealisasi(String(estimatedValue))
+    }
+  }, [kpiLevel, kpiList, task, initialTask?.realisasi_waktu_menit])
 
   useEffect(() => {
     let active = true
@@ -224,7 +243,7 @@ export function TaskEditor({
             deskripsi: deskripsi || null,
             kategori,
             kpi_level: Number(kpiLevel),
-            kpi_bobot: kpiInfo?.bobot ?? current.kpi_bobot,
+            kpi_bobot: kpiInfo?.bobot ?? current.kpi_bobot ?? Number(kpiLevel),
             estimasi_waktu_menit: kpiInfo?.estimasi ?? current.estimasi_waktu_menit,
             user_id: assigneeId,
             task_date: taskDate,
@@ -405,7 +424,7 @@ export function TaskEditor({
               type="number"
               placeholder="120"
               value={realisasi}
-              onChange={(e) => setRealisasi(e.target.value)}
+              onChange={(e) => { realisasiTouched.current = true; setRealisasi(e.target.value) }}
             />
           </div>
         </div>

@@ -157,8 +157,7 @@ export function TaskCreateEditor({
       return
     }
 
-    router.push("/dashboard/tasks")
-    router.refresh()
+    router.replace("/dashboard/tasks")
   }
 
   return (

@@ -100,6 +100,9 @@ BEGIN
   IF NEW.status = 'selesai' THEN
     NEW.waktu_terselesaikan := COALESCE(NEW.waktu_terselesaikan, NEW.selesai_at, NOW());
     NEW.selesai_at := NEW.waktu_terselesaikan;
+    IF NEW.realisasi_waktu_menit IS NULL THEN
+      NEW.realisasi_waktu_menit := NEW.estimasi_waktu_menit * GREATEST(NEW.kuantitas_output, 1);
+    END IF;
   ELSE
     NEW.waktu_terselesaikan := NULL;
     NEW.selesai_at := NULL;

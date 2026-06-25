@@ -40,6 +40,7 @@ type NavItem = {
 function SidebarNavigation({
   compact,
   navItems,
+  settingsItem,
   pathname,
   profileName,
   profileRole,
@@ -48,48 +49,60 @@ function SidebarNavigation({
 }: {
   compact: boolean
   navItems: NavItem[]
+  settingsItem: NavItem
   pathname: string
   profileName: string
   profileRole: string
   onNavigate: () => void
   onLogout: () => void
 }) {
+  function isActive(href: string) {
+    return pathname === href || (href !== "/dashboard" && pathname.startsWith(href))
+  }
+
   return (
     <>
       <nav className="flex-1 space-y-0.5 px-2 py-2" aria-label="Navigasi utama">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href))
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={compact ? label : undefined}
-              onClick={onNavigate}
-              className={cn(
-                "notion-sidebar-item min-h-8",
-                compact && "justify-center px-2",
-                isActive && "active font-medium"
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0 opacity-60" />
-              {!compact && <span className="truncate">{label}</span>}
-            </Link>
-          )
-        })}
+        {navItems.map(({ href, label, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            title={compact ? label : undefined}
+            onClick={onNavigate}
+            className={cn(
+              "notion-sidebar-item min-h-8",
+              compact && "justify-center px-2",
+              isActive(href) && "active font-medium"
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0 opacity-60" />
+            {!compact && <span className="truncate">{label}</span>}
+          </Link>
+        ))}
       </nav>
 
       <div className="border-t border-[#e9e9e7] p-2">
-        <div className={cn("mb-1 flex items-center gap-2 px-2 py-1.5", compact && "justify-center px-0")}>
+        <Link
+          href={settingsItem.href}
+          title={compact ? settingsItem.label : undefined}
+          onClick={onNavigate}
+          className={cn(
+            "mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-[#00000008]",
+            compact && "justify-center px-0",
+            isActive(settingsItem.href) && "bg-[#00000008]"
+          )}
+        >
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white text-xs font-semibold text-neutral-600 shadow-sm ring-1 ring-black/5">
             {profileName.charAt(0).toUpperCase()}
           </span>
           {!compact && (
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-medium text-neutral-700">{profileName}</span>
               <span className="block truncate text-[11px] text-neutral-400">{roleLabels[profileRole] || profileRole}</span>
             </span>
           )}
-        </div>
+          <settingsItem.icon className={cn("h-4 w-4 shrink-0 text-neutral-400", compact && "hidden")} />
+        </Link>
         <button
           type="button"
           onClick={onLogout}
@@ -115,10 +128,11 @@ export default function DashboardSidebar({ isAdmin, profileName, profileRole }: 
     { href: "/dashboard", label: "Beranda", icon: LayoutDashboard },
     { href: "/dashboard/tasks", label: "Pekerjaan", icon: ListTodo },
     { href: "/dashboard/laporan/bulanan", label: "Laporan", icon: BarChart3 },
-    ...(isAdmin
-      ? [{ href: "/dashboard/admin/kpi", label: "Aturan KPI", icon: Settings }]
-      : [{ href: "/dashboard/pengaturan", label: "Pengaturan", icon: UserRoundCog }]),
   ]
+
+  const settingsItem: NavItem = isAdmin
+    ? { href: "/dashboard/admin/kpi", label: "Aturan KPI", icon: Settings }
+    : { href: "/dashboard/pengaturan", label: "Pengaturan", icon: UserRoundCog }
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -148,6 +162,7 @@ export default function DashboardSidebar({ isAdmin, profileName, profileRole }: 
             <SidebarNavigation
               compact={false}
               navItems={navItems}
+              settingsItem={settingsItem}
               pathname={pathname}
               profileName={profileName}
               profileRole={profileRole}
@@ -177,6 +192,7 @@ export default function DashboardSidebar({ isAdmin, profileName, profileRole }: 
         <SidebarNavigation
           compact={collapsed}
           navItems={navItems}
+          settingsItem={settingsItem}
           pathname={pathname}
           profileName={profileName}
           profileRole={profileRole}

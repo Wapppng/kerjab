@@ -44,16 +44,17 @@ function periodBoundaries(year: number, month: number) {
   }
 }
 
-function getUserSummary(summaries: Record<string, ReportUserSummary>, task: ReportTask) {
+function getUserSummary(summaries: Record<string, ReportUserSummary>, task: ReportTask, profileNameMap: Map<string, string>) {
   if (!summaries[task.user_id]) {
     summaries[task.user_id] = {
-      name: task.assignee?.[0]?.name || "Tanpa Nama",
+      name: profileNameMap.get(task.user_id) || task.assignee?.[0]?.name || "Tanpa Nama",
       totalCreated: 0,
       totalCompleted: 0,
       totalOutput: 0,
       totalKpi: 0,
       totalEstimasi: 0,
       totalRealisasi: 0,
+      rasioRealisasi: 0,
     }
   }
 
@@ -117,21 +118,23 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
   const createdTasks = (createdResult.data || []) as unknown as ReportTask[]
   const completedTasks = (completedResult.data || []) as unknown as ReportTask[]
   const allProfiles = (profilesResult.data || []) as ProfileOption[]
+  const profileNameMap = new Map(allProfiles.map((p) => [p.id, p.name]))
   const taskByUser: Record<string, ReportUserSummary> = {}
   const taskByCategory: Record<string, ReportCategorySummary> = {}
 
   for (const task of createdTasks) {
-    getUserSummary(taskByUser, task).totalCreated += 1
+    getUserSummary(taskByUser, task, profileNameMap).totalCreated += 1
   }
 
   for (const task of completedTasks) {
-    const summary = getUserSummary(taskByUser, task)
+    const summary = getUserSummary(taskByUser, task, profileNameMap)
     const output = task.kuantitas_output || 1
     summary.totalCompleted += 1
     summary.totalOutput += output
     summary.totalKpi += task.kpi_bobot ?? task.kpi_level
     summary.totalEstimasi += task.estimasi_waktu_menit * output
-    summary.totalRealisasi += task.realisasi_waktu_menit || 0
+    const realisasi = task.realisasi_waktu_menit || 0
+    summary.totalRealisasi += realisasi
 
     if (!taskByCategory[task.kategori]) {
       taskByCategory[task.kategori] = { completedTasks: 0, totalOutput: 0 }
@@ -139,6 +142,13 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
     taskByCategory[task.kategori].completedTasks += 1
     taskByCategory[task.kategori].totalOutput += output
   }
+
+  for (const summary of Object.values(taskByUser)) {
+    summary.rasioRealisasi = summary.totalEstimasi > 0 ? summary.totalRealisasi / summary.totalEstimasi : 0
+  }
+
+  const validSummaries = Object.values(taskByUser).filter((summary) => summary.totalEstimasi > 0)
+  const overallRasioRealisasi = validSummaries.reduce((total, summary) => total + (summary.rasioRealisasi || 0), 0) / validSummaries.length || 0
 
   const totalKpi = completedTasks.reduce((total, task) => total + (task.kpi_bobot ?? task.kpi_level), 0)
   const totalOutput = completedTasks.reduce((total, task) => total + (task.kuantitas_output || 1), 0)
@@ -200,22 +210,29 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
         </div>
       </form>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Task Dibuat", value: createdTasks.length, description: "Beban masuk periode ini" },
-          { label: "Task Selesai", value: completedTasks.length, description: "Output selesai periode ini" },
-          { label: "Kuantitas Output", value: totalOutput, description: "Total unit yang dihasilkan" },
-          { label: "KPI Earned", value: totalKpi, description: "Hanya dari task selesai" },
-        ].map(({ label, value, description }) => (
-          <div key={label} className="rounded-lg border border-[#e5e5e5] p-4">
-            <div className="text-sm text-neutral-500">{label}</div>
-            <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
-            <p className="mt-1 text-xs text-neutral-400">{description}</p>
+      <section>
+        <h2 className="mb-3 text-sm font-medium text-neutral-500">Deskripsi Bulanan</h2>
+        <div className="rounded-lg border border-[#e5e5e5] bg-[#fbfbfa] p-4 space-y-3">
+          <div className="grid gap-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-neutral-600">Total KPI Earned:</span>
+              <span className="font-medium text-neutral-900">{totalKpi} (hanya dari task selesai)</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-600">Total Kuantitas Output:</span>
+              <span className="font-medium text-neutral-900">{totalOutput} (berdasarkan kuanta output per task)</span>
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
+      </section>
 
-      <LaporanClient taskByUser={taskByUser} taskByCategory={taskByCategory} month={month} year={year} />
+      <LaporanClient 
+        taskByUser={taskByUser} 
+        taskByCategory={taskByCategory} 
+        month={month} 
+        year={year}
+        overallRasioRealisasi={overallRasioRealisasi}
+      />
 
       <section>
         <h2 className="mb-3 text-sm font-medium text-neutral-500">Rekap per Karyawan</h2>
@@ -225,7 +242,7 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-[#e5e5e5]">
-            <table className="notion-table min-w-[820px]">
+            <table className="notion-table min-w-[920px]">
               <thead>
                 <tr>
                   <th>Karyawan</th>
@@ -235,6 +252,7 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
                   <th>KPI</th>
                   <th>Estimasi</th>
                   <th>Realisasi</th>
+                  <th>R. Realisasi</th>
                 </tr>
               </thead>
               <tbody>
@@ -247,6 +265,7 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
                     <td>{data.totalKpi}</td>
                     <td className="text-neutral-500">{formatMenit(data.totalEstimasi)}</td>
                     <td className="text-neutral-500">{data.totalRealisasi ? formatMenit(data.totalRealisasi) : "-"}</td>
+                    <td className="text-neutral-500">{data.rasioRealisasi ? (data.rasioRealisasi * 100).toFixed(1) + "%" : "-"}</td>
                   </tr>
                 ))}
               </tbody>
