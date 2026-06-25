@@ -130,7 +130,7 @@ export default async function LaporanBulananPage({ searchParams }: { searchParam
     summary.totalCompleted += 1
     summary.totalOutput += output
     summary.totalKpi += task.kpi_bobot ?? task.kpi_level
-    summary.totalEstimasi += task.estimasi_waktu_menit
+    summary.totalEstimasi += task.estimasi_waktu_menit * output
     summary.totalRealisasi += task.realisasi_waktu_menit || 0
 
     if (!taskByCategory[task.kategori]) {

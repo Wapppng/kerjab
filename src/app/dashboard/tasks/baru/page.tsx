@@ -173,7 +173,7 @@ export default function NewTaskPage() {
 
         {selectedKpi && (
           <div className="rounded-md border border-[#e5e5e5] px-4 py-3 text-sm text-neutral-600">
-            Estimasi: <strong>{selectedKpi.estimasi} menit</strong> &middot; Bobot: {selectedKpi.bobot}
+            Estimasi: <strong>{selectedKpi.estimasi * Number(form.kuantitas_output || 1)} menit</strong> &middot; Bobot: {selectedKpi.bobot}
           </div>
         )}
 

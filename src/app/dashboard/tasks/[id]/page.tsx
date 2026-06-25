@@ -191,7 +191,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
         {kpiInfo && (
           <div className="rounded-md border border-[#e5e5e5] px-4 py-3 text-sm text-neutral-600">
-            Estimasi: <strong>{formatMenit(kpiInfo.estimasi)}</strong>
+            Estimasi: <strong>{formatMenit(kpiInfo.estimasi * Number(kuantitasOutput || 1))}</strong>
             {realisasi && <> &middot; Realisasi: <strong>{formatMenit(Number(realisasi))}</strong></>}
           </div>
         )}

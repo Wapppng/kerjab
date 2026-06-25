@@ -166,7 +166,7 @@ export function TaskList({ tasks, isAdmin, userId }: { tasks: Task[]; isAdmin: b
                     <td className="text-neutral-500 text-xs">
                       {task.kpi_bobot ?? task.kpi_level} <span className="text-neutral-300">(L{task.kpi_level})</span>
                     </td>
-                    <td className="text-neutral-500 text-xs">{formatMenit(task.estimasi_waktu_menit)}</td>
+                    <td className="text-neutral-500 text-xs">{formatMenit(task.estimasi_waktu_menit * (task.kuantitas_output || 1))}</td>
                     <td>
                       <select
                         className="notion-select text-xs"
